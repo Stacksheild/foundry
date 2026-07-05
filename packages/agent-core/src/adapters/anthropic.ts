@@ -3,13 +3,17 @@ import type { AdapterConfig, AgentAdapter, ChatMessage } from "../types";
 export class AnthropicAdapter implements AgentAdapter {
   readonly provider = "anthropic";
   private apiKey: string;
-  private model: string;
+  private modelName: string;
   private baseUrl: string;
 
   constructor(config: AdapterConfig = {}) {
     this.apiKey = config.apiKey ?? process.env.ANTHROPIC_API_KEY ?? "";
-    this.model = config.model ?? "claude-opus-4-8";
+    this.modelName = config.model ?? "claude-opus-4-8";
     this.baseUrl = config.baseUrl ?? "https://api.anthropic.com/v1/messages";
+  }
+
+  get model(): string {
+    return this.modelName;
   }
 
   async complete(messages: ChatMessage[]): Promise<string> {
@@ -25,7 +29,7 @@ export class AnthropicAdapter implements AgentAdapter {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: this.model,
+        model: this.modelName,
         max_tokens: 4096,
         system,
         messages: rest.map((m) => ({ role: m.role, content: m.content })),

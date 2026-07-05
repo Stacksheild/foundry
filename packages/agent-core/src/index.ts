@@ -18,3 +18,6 @@ export function createAdapter(provider: Provider, config: AdapterConfig = {}): A
       return new OllamaAdapter(config);
   }
 }
+
+export { pickAdapter, SUPPORTED_ROUTER_PROVIDERS } from "./router";
+export type { PickAdapterResult } from "./router";

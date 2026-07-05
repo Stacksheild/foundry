@@ -7,6 +7,7 @@ export interface ChatMessage {
 
 export interface AgentAdapter {
   readonly provider: string;
+  readonly model: string;
   complete(messages: ChatMessage[]): Promise<string>;
 }
 

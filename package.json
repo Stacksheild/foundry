@@ -6,10 +6,12 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --filter @foundry/web dev",
-    "build": "pnpm -r build",
-    "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test"
+    "build:vendor": "pnpm --filter @sentinelai/core --filter @sentinelai/model-router --filter @sentinelai/scanner build",
+    "build:libs": "pnpm --filter @foundry/scanner-service --filter @foundry/compute-providers build",
+    "build": "pnpm --filter '!./vendor/**' -r build",
+    "lint": "pnpm --filter '!./vendor/**' -r lint",
+    "typecheck": "pnpm --filter '!./vendor/**' -r typecheck",
+    "test": "pnpm --filter '!./vendor/**' -r test"
   },
   "packageManager": "pnpm@10.33.2",
   "engines": {
@@ -17,6 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.14.0",
+    "@types/node": "^22.9.0",
     "eslint": "^9.14.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "globals": "^15.11.0",
