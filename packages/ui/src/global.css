@@ -1,0 +1,109 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  color: #1e1e1e;
+  background: #fff;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input,
+textarea {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d5d5d5;
+  border-radius: 3px;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.anim-slide {
+  animation: slideUp 0.22s ease both;
+}
+
+.anim-fade {
+  animation: fadeIn 0.28s ease both;
+}
+
+.row-hover {
+  transition: background 0.1s;
+}
+.row-hover:hover {
+  background: #fafafa !important;
+}
+
+.btn-ghost:hover {
+  background: #f5f5f5 !important;
+}
+
+.card-hover {
+  transition:
+    box-shadow 0.12s,
+    border-color 0.12s;
+}
+.card-hover:hover {
+  box-shadow: 0 4px 16px rgba(82, 88, 228, 0.11) !important;
+  border-color: rgba(82, 88, 228, 0.38) !important;
+}
