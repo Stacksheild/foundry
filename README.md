@@ -10,6 +10,18 @@ or a local model via Ollama), your own compute (exe.dev sandboxes today,
 AWS/Azure reserved for later), your own deploy target (Docker/K8s, Vercel,
 Fly.io, or your own CI), and your own design system.
 
+## Live demo
+
+**[foundry-blond.vercel.app](https://foundry-blond.vercel.app)** — try the
+reference UI in your browser, no install needed. Click through Home → Build →
+Dashboard → Deploy from the header. This is `apps/web` deployed as-is: the
+four reference screens on mock data (see [Status](#status) below for what's
+real vs. UI-only).
+
+This isn't wired to auto-deploy on push yet — Vercel's GitHub App isn't
+connected to the `Stacksheild` org (needs an org admin to authorize it).
+Until then, redeploy manually from the repo root: `vercel --prod`.
+
 ## Status
 
 Early-stage. `packages/ui` has a working reference UI for the four core
