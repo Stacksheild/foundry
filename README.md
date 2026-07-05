@@ -18,9 +18,11 @@ Dashboard → Deploy from the header. This is `apps/web` deployed as-is: the
 four reference screens on mock data (see [Status](#status) below for what's
 real vs. UI-only).
 
-This isn't wired to auto-deploy on push yet — Vercel's GitHub App isn't
-connected to the `Stacksheild` org (needs an org admin to authorize it).
-Until then, redeploy manually from the repo root: `vercel --prod`.
+Kept up to date via [`.github/workflows/deploy-demo.yml`](.github/workflows/deploy-demo.yml)
+(CLI-based, not Vercel's native GitHub App — that failed to authorize for
+the `Stacksheild` org) — every push to `main` redeploys it, once a
+`VERCEL_TOKEN` repo secret is set. Until that secret exists, redeploy
+manually from the repo root: `vercel --prod`.
 
 ## Status
 
