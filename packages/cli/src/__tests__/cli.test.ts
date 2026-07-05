@@ -28,10 +28,12 @@ import { templatesCommand } from "../commands/templates.js";
 import { configCommand } from "../commands/config.js";
 import { chatCommand } from "../commands/chat.js";
 import { appsCommand } from "../commands/apps.js";
+import { deployCommand } from "../commands/deploy.js";
 import { devCommand } from "../commands/dev.js";
 import { runScan } from "@foundry/scanner-service";
 import { createComputeProvider } from "@foundry/compute-providers";
 import { createAdapter, pickAdapter } from "@foundry/agent-core";
+import { getDb, registerApp, getApp } from "@foundry/app-registry";
 
 describe("CLI command registration", () => {
   it("registers all top-level commands with the expected names", () => {
@@ -42,6 +44,7 @@ describe("CLI command registration", () => {
     expect(configCommand.name()).toBe("config");
     expect(chatCommand.name()).toBe("chat");
     expect(appsCommand.name()).toBe("apps");
+    expect(deployCommand.name()).toBe("deploy");
     expect(devCommand.name()).toBe("dev");
   });
 
@@ -330,6 +333,83 @@ describe("apps command", () => {
       await appsCommand.parseAsync(["node", "foundry", "register", "checkout-svc"]);
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("already registered"));
       expect(process.exitCode).toBe(1);
+    } finally {
+      process.exitCode = 0;
+      errorSpy.mockRestore();
+    }
+  });
+});
+
+describe("deploy command", () => {
+  const mockProvider = { create: vi.fn(), list: vi.fn(), destroy: vi.fn(), name: "exedev" };
+
+  beforeEach(() => {
+    vi.mocked(createComputeProvider).mockReturnValue(mockProvider as never);
+    mockProvider.create.mockReset();
+    mockProvider.destroy.mockReset();
+  });
+
+  it("errors clearly when the app isn't registered", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await deployCommand.parseAsync(["node", "foundry", "unregistered-svc"]);
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("No app named"));
+      expect(process.exitCode).toBe(1);
+      expect(mockProvider.create).not.toHaveBeenCalled();
+    } finally {
+      process.exitCode = 0;
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("provisions a VM and updates the registry with status/url/vmName", async () => {
+    registerApp(getDb(), { name: "deploy-svc" });
+    mockProvider.create.mockResolvedValue({
+      name: "deploy-svc",
+      httpsUrl: "https://deploy-svc.exe.xyz",
+      region: "lon",
+      status: "running",
+      sshDest: "deploy-svc.exe.xyz",
+    });
+
+    await deployCommand.parseAsync(["node", "foundry", "deploy-svc", "--cpu", "2"]);
+
+    expect(mockProvider.create).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "deploy-svc", cpu: 2 }),
+    );
+    const app = getApp(getDb(), "deploy-svc");
+    expect(app).toMatchObject({
+      status: "healthy",
+      url: "https://deploy-svc.exe.xyz",
+      vmName: "deploy-svc",
+    });
+  });
+
+  it("destroys the previous VM on redeploy", async () => {
+    mockProvider.create.mockResolvedValue({
+      name: "deploy-svc",
+      httpsUrl: "https://deploy-svc-2.exe.xyz",
+      region: "lon",
+      status: "running",
+      sshDest: "deploy-svc-2.exe.xyz",
+    });
+    mockProvider.destroy.mockResolvedValue(undefined);
+
+    await deployCommand.parseAsync(["node", "foundry", "deploy-svc"]);
+
+    expect(mockProvider.destroy).toHaveBeenCalledWith("deploy-svc");
+  });
+
+  it("marks the app as error and surfaces the failure when provisioning fails", async () => {
+    registerApp(getDb(), { name: "fails-svc" });
+    mockProvider.create.mockRejectedValue(new Error("EXE_DEV_TOKEN is not set"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await deployCommand.parseAsync(["node", "foundry", "fails-svc"]);
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Deploy failed"));
+      expect(process.exitCode).toBe(1);
+      expect(getApp(getDb(), "fails-svc")?.status).toBe("error");
     } finally {
       process.exitCode = 0;
       errorSpy.mockRestore();
