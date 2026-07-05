@@ -8,6 +8,7 @@ import { configCommand } from "./commands/config.js";
 import { chatCommand } from "./commands/chat.js";
 import { appsCommand } from "./commands/apps.js";
 import { deployCommand } from "./commands/deploy.js";
+import { checkCommand } from "./commands/check.js";
 import { devCommand } from "./commands/dev.js";
 
 const program = new Command()
@@ -23,6 +24,7 @@ program.addCommand(configCommand);
 program.addCommand(chatCommand);
 program.addCommand(appsCommand);
 program.addCommand(deployCommand);
+program.addCommand(checkCommand);
 program.addCommand(devCommand);
 
 program.parse();

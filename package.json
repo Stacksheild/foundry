@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "pnpm --filter @foundry/web dev",
     "build:vendor": "pnpm --filter @sentinelai/core --filter @sentinelai/model-router --filter @sentinelai/scanner build",
-    "build:libs": "pnpm --filter @foundry/agent-core --filter @foundry/scanner-service --filter @foundry/compute-providers --filter @foundry/app-registry build",
+    "build:libs": "pnpm --filter @foundry/agent-core --filter @foundry/scanner-service --filter @foundry/compute-providers --filter @foundry/app-registry --filter @foundry/health-checks build",
     "build": "pnpm --filter '!./vendor/**' -r build",
     "lint": "pnpm --filter '!./vendor/**' -r lint",
     "typecheck": "pnpm --filter '!./vendor/**' -r typecheck",

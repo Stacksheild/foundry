@@ -19,6 +19,11 @@ vi.mock("@foundry/agent-core", () => ({
   pickAdapter: vi.fn(),
 }));
 
+vi.mock("@foundry/health-checks", () => ({
+  runHealthChecks: vi.fn(),
+  defaultHealthChecks: vi.fn(() => []),
+}));
+
 process.env.FOUNDRY_REGISTRY_DB_PATH = ":memory:";
 
 import { scanCommand } from "../commands/scan.js";
@@ -29,11 +34,13 @@ import { configCommand } from "../commands/config.js";
 import { chatCommand } from "../commands/chat.js";
 import { appsCommand } from "../commands/apps.js";
 import { deployCommand } from "../commands/deploy.js";
+import { checkCommand } from "../commands/check.js";
 import { devCommand } from "../commands/dev.js";
 import { runScan } from "@foundry/scanner-service";
 import { createComputeProvider } from "@foundry/compute-providers";
 import { createAdapter, pickAdapter } from "@foundry/agent-core";
 import { getDb, registerApp, getApp } from "@foundry/app-registry";
+import { runHealthChecks } from "@foundry/health-checks";
 
 describe("CLI command registration", () => {
   it("registers all top-level commands with the expected names", () => {
@@ -45,6 +52,7 @@ describe("CLI command registration", () => {
     expect(chatCommand.name()).toBe("chat");
     expect(appsCommand.name()).toBe("apps");
     expect(deployCommand.name()).toBe("deploy");
+    expect(checkCommand.name()).toBe("check");
     expect(devCommand.name()).toBe("dev");
   });
 
@@ -412,6 +420,45 @@ describe("deploy command", () => {
       expect(getApp(getDb(), "fails-svc")?.status).toBe("error");
     } finally {
       process.exitCode = 0;
+      errorSpy.mockRestore();
+    }
+  });
+});
+
+describe("check command", () => {
+  it("prints each result and exits 0 when everything passes", async () => {
+    vi.mocked(runHealthChecks).mockResolvedValue([
+      { name: "security-scan", status: "pass", summary: "no findings", durationMs: 5 },
+      { name: "unit-tests", status: "skip", summary: "no test script", durationMs: 1 },
+    ]);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    try {
+      await checkCommand.parseAsync(["node", "foundry", "some/path"]);
+      expect(runHealthChecks).toHaveBeenCalledWith("some/path", []);
+      const printed = logSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(printed).toContain("security-scan");
+      expect(printed).toContain("unit-tests");
+      expect(process.exitCode).toBe(0);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it("exits 1 and reports a failure count when a check fails", async () => {
+    vi.mocked(runHealthChecks).mockResolvedValue([
+      { name: "security-scan", status: "fail", summary: "1 critical finding", durationMs: 5 },
+    ]);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await checkCommand.parseAsync(["node", "foundry", "some/path"]);
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("1 check(s) failed"));
+      expect(process.exitCode).toBe(1);
+    } finally {
+      process.exitCode = 0;
+      logSpy.mockRestore();
       errorSpy.mockRestore();
     }
   });

@@ -18,6 +18,7 @@
     "@foundry/agent-core": "workspace:*",
     "@foundry/app-registry": "workspace:*",
     "@foundry/compute-providers": "workspace:*",
+    "@foundry/health-checks": "workspace:*",
     "@foundry/scanner-service": "workspace:*",
     "commander": "^13.0.0",
     "yaml": "^2.9.0"
