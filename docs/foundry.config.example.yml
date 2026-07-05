@@ -1,0 +1,14 @@
+# Example golden-path config for `foundry create`. Copy this to your own
+# repo root as `foundry.config.yml` — Foundry walks up from the current
+# directory looking for it, the same way ESLint/Prettier find their configs.
+#
+# All fields are optional. Today only `defaultTemplate` is actually read
+# (by `foundry create`, when --template isn't passed). framework/apiBase/auth
+# are reserved for Phase 2+ once the scaffolding engine and agent wiring use
+# them to generate code against your org's real stack — see
+# docs/development-plan.md.
+
+framework: react-vite
+apiBase: https://api.internal.example.com
+auth: oidc
+defaultTemplate: metrics-dashboard

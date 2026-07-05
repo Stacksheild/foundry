@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Command } from "commander";
@@ -18,6 +18,7 @@ import { scanCommand } from "../commands/scan.js";
 import { sandboxCommand } from "../commands/sandbox.js";
 import { createCommand } from "../commands/create.js";
 import { templatesCommand } from "../commands/templates.js";
+import { configCommand } from "../commands/config.js";
 import { devCommand } from "../commands/dev.js";
 import { runScan } from "@foundry/scanner-service";
 import { createComputeProvider } from "@foundry/compute-providers";
@@ -28,6 +29,7 @@ describe("CLI command registration", () => {
     expect(sandboxCommand.name()).toBe("sandbox");
     expect(createCommand.name()).toBe("create");
     expect(templatesCommand.name()).toBe("templates");
+    expect(configCommand.name()).toBe("config");
     expect(devCommand.name()).toBe("dev");
   });
 
@@ -98,6 +100,22 @@ describe("create command", () => {
     }
   });
 
+  it("falls back to foundry.config.yml's defaultTemplate when --template isn't passed", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "foundry-cli-test-"));
+    const dest = join(tmp, "my-app");
+
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmp);
+    try {
+      writeFileSync(join(tmp, "foundry.config.yml"), "defaultTemplate: crud-admin\n");
+      await createCommand.parseAsync(["node", "foundry", "my-app"]);
+      expect(existsSync(join(dest, "src/server.js"))).toBe(true);
+      expect(existsSync(join(dest, "src/public/index.html"))).toBe(true);
+    } finally {
+      cwdSpy.mockRestore();
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
   it("scaffolds a different template via --template", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "foundry-cli-test-"));
     const dest = join(tmp, "my-dash");
@@ -156,6 +174,38 @@ describe("templates command", () => {
       );
     } finally {
       logSpy.mockRestore();
+    }
+  });
+});
+
+describe("config command", () => {
+  it("reports no config found when none exists", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "foundry-cli-test-"));
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmp);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await configCommand.parseAsync(["node", "foundry"]);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("No foundry.config.yml found"));
+    } finally {
+      cwdSpy.mockRestore();
+      logSpy.mockRestore();
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("prints the resolved config when one exists", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "foundry-cli-test-"));
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmp);
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      writeFileSync(join(tmp, "foundry.config.yml"), "defaultTemplate: crud-admin\n");
+      await configCommand.parseAsync(["node", "foundry"]);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Loaded from"));
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("crud-admin"));
+    } finally {
+      cwdSpy.mockRestore();
+      logSpy.mockRestore();
+      rmSync(tmp, { recursive: true, force: true });
     }
   });
 });

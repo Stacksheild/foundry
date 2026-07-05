@@ -4,6 +4,7 @@ import { scanCommand } from "./commands/scan.js";
 import { sandboxCommand } from "./commands/sandbox.js";
 import { createCommand } from "./commands/create.js";
 import { templatesCommand } from "./commands/templates.js";
+import { configCommand } from "./commands/config.js";
 import { devCommand } from "./commands/dev.js";
 
 const program = new Command()
@@ -15,6 +16,7 @@ program.addCommand(scanCommand);
 program.addCommand(sandboxCommand);
 program.addCommand(createCommand);
 program.addCommand(templatesCommand);
+program.addCommand(configCommand);
 program.addCommand(devCommand);
 
 program.parse();
