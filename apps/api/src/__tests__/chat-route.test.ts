@@ -36,11 +36,13 @@ describe("POST /build/chat — enabled", () => {
 
   beforeAll(async () => {
     process.env.FOUNDRY_ENABLE_AGENT = "true";
+    process.env.FOUNDRY_DB_PATH = ":memory:";
     app = await buildApp();
   });
 
   afterAll(async () => {
     delete process.env.FOUNDRY_ENABLE_AGENT;
+    delete process.env.FOUNDRY_DB_PATH;
     await app.close();
   });
 
@@ -59,6 +61,30 @@ describe("POST /build/chat — enabled", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toBe("Hello");
+    expect(res.headers["x-foundry-session-id"]).toBeDefined();
+  });
+
+  it("persists the user + assistant turn to a real session, retrievable via /build/sessions", async () => {
+    mockAdapter.stream.mockReturnValue(fakeStream(["Real", " reply"]));
+
+    const chatRes = await app.inject({
+      method: "POST",
+      url: "/build/chat",
+      payload: { messages: [{ role: "user", content: "Build a dashboard" }] },
+    });
+    const sessionId = Number(chatRes.headers["x-foundry-session-id"]);
+
+    const sessionRes = await app.inject({ method: "GET", url: `/build/sessions/${sessionId}` });
+    expect(sessionRes.statusCode).toBe(200);
+    const body = sessionRes.json();
+    expect(body.session.title).toBe("Build a dashboard");
+    expect(body.messages).toEqual([
+      expect.objectContaining({ role: "user", content: "Build a dashboard" }),
+      expect.objectContaining({ role: "assistant", content: "Real reply" }),
+    ]);
+
+    const listRes = await app.inject({ method: "GET", url: "/build/sessions" });
+    expect(listRes.json().sessions.some((s: { id: number }) => s.id === sessionId)).toBe(true);
   });
 
   it("returns 400 when messages is missing or empty", async () => {
