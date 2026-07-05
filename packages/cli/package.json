@@ -15,6 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@foundry/agent-core": "workspace:*",
     "@foundry/compute-providers": "workspace:*",
     "@foundry/scanner-service": "workspace:*",
     "commander": "^13.0.0",

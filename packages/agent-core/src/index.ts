@@ -1,9 +1,9 @@
-import { AnthropicAdapter } from "./adapters/anthropic";
-import { OpenAIAdapter } from "./adapters/openai";
-import { OllamaAdapter } from "./adapters/ollama";
-import type { AdapterConfig, AgentAdapter } from "./types";
+import { AnthropicAdapter } from "./adapters/anthropic.js";
+import { OpenAIAdapter } from "./adapters/openai.js";
+import { OllamaAdapter } from "./adapters/ollama.js";
+import type { AdapterConfig, AgentAdapter } from "./types.js";
 
-export type { AgentAdapter, AdapterConfig, ChatMessage, ChatRole } from "./types";
+export type { AgentAdapter, AdapterConfig, ChatMessage, ChatRole } from "./types.js";
 export { AnthropicAdapter, OpenAIAdapter, OllamaAdapter };
 
 export type Provider = "anthropic" | "openai" | "ollama";
@@ -19,5 +19,5 @@ export function createAdapter(provider: Provider, config: AdapterConfig = {}): A
   }
 }
 
-export { pickAdapter, SUPPORTED_ROUTER_PROVIDERS } from "./router";
-export type { PickAdapterResult } from "./router";
+export { pickAdapter, SUPPORTED_ROUTER_PROVIDERS } from "./router.js";
+export type { PickAdapterResult } from "./router.js";

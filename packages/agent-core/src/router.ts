@@ -1,7 +1,7 @@
 import { recommend } from "@sentinelai/model-router";
 import type { RouteRequest, RouteRecommendation } from "@sentinelai/core";
-import { createAdapter } from "./index";
-import type { AgentAdapter, AdapterConfig } from "./types";
+import { createAdapter } from "./index.js";
+import type { AgentAdapter, AdapterConfig } from "./types.js";
 
 /**
  * Providers Foundry has a real AgentAdapter for. Deliberately narrower than

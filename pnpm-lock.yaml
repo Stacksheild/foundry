@@ -107,6 +107,9 @@ importers:
 
   packages/cli:
     dependencies:
+      '@foundry/agent-core':
+        specifier: workspace:*
+        version: link:../agent-core
       '@foundry/compute-providers':
         specifier: workspace:*
         version: link:../compute-providers

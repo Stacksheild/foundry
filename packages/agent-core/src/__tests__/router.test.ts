@@ -5,9 +5,9 @@ vi.mock("@sentinelai/model-router", () => ({
 }));
 
 import { recommend } from "@sentinelai/model-router";
-import { pickAdapter, SUPPORTED_ROUTER_PROVIDERS } from "../router";
-import { AnthropicAdapter } from "../adapters/anthropic";
-import { OpenAIAdapter } from "../adapters/openai";
+import { pickAdapter, SUPPORTED_ROUTER_PROVIDERS } from "../router.js";
+import { AnthropicAdapter } from "../adapters/anthropic.js";
+import { OpenAIAdapter } from "../adapters/openai.js";
 
 const mockRecommend = vi.mocked(recommend);
 

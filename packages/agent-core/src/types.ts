@@ -9,6 +9,7 @@ export interface AgentAdapter {
   readonly provider: string;
   readonly model: string;
   complete(messages: ChatMessage[]): Promise<string>;
+  stream(messages: ChatMessage[]): AsyncIterable<string>;
 }
 
 export interface AdapterConfig {

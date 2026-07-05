@@ -14,14 +14,21 @@ vi.mock("@foundry/compute-providers", () => ({
   createComputeProvider: vi.fn(),
 }));
 
+vi.mock("@foundry/agent-core", () => ({
+  createAdapter: vi.fn(),
+  pickAdapter: vi.fn(),
+}));
+
 import { scanCommand } from "../commands/scan.js";
 import { sandboxCommand } from "../commands/sandbox.js";
 import { createCommand } from "../commands/create.js";
 import { templatesCommand } from "../commands/templates.js";
 import { configCommand } from "../commands/config.js";
+import { chatCommand } from "../commands/chat.js";
 import { devCommand } from "../commands/dev.js";
 import { runScan } from "@foundry/scanner-service";
 import { createComputeProvider } from "@foundry/compute-providers";
+import { createAdapter, pickAdapter } from "@foundry/agent-core";
 
 describe("CLI command registration", () => {
   it("registers all top-level commands with the expected names", () => {
@@ -30,6 +37,7 @@ describe("CLI command registration", () => {
     expect(createCommand.name()).toBe("create");
     expect(templatesCommand.name()).toBe("templates");
     expect(configCommand.name()).toBe("config");
+    expect(chatCommand.name()).toBe("chat");
     expect(devCommand.name()).toBe("dev");
   });
 
@@ -206,6 +214,65 @@ describe("config command", () => {
       cwdSpy.mockRestore();
       logSpy.mockRestore();
       rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+async function* fakeStream(chunks: string[]) {
+  for (const c of chunks) yield c;
+}
+
+describe("chat command", () => {
+  beforeEach(() => {
+    vi.mocked(createAdapter).mockReset();
+    vi.mocked(pickAdapter).mockReset();
+  });
+
+  it("uses model-router (pickAdapter) by default and streams the response", async () => {
+    const mockAdapter = { provider: "anthropic", model: "claude-sonnet-4-20250514", stream: () => fakeStream(["Hel", "lo"]) };
+    vi.mocked(pickAdapter).mockReturnValue({
+      adapter: mockAdapter as never,
+      recommendation: { selected: "anthropic/claude-sonnet-4-20250514", reasoning: "", rankings: [] },
+    });
+
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    try {
+      await chatCommand.parseAsync(["node", "foundry", "hello there"]);
+      expect(pickAdapter).toHaveBeenCalledWith({ taskType: undefined, prompt: "hello there" });
+      const written = writeSpy.mock.calls.map((c) => c[0]).join("");
+      expect(written).toContain("Hello");
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
+  it("bypasses model-router when --provider is given", async () => {
+    const mockAdapter = { provider: "ollama", model: "llama3", stream: () => fakeStream(["hi"]) };
+    vi.mocked(createAdapter).mockReturnValue(mockAdapter as never);
+
+    const writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    try {
+      await chatCommand.parseAsync(["node", "foundry", "hello", "--provider", "ollama"]);
+      expect(createAdapter).toHaveBeenCalledWith("ollama", { model: undefined });
+      expect(pickAdapter).not.toHaveBeenCalled();
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
+  it("reports a clear error and sets a nonzero exit code on failure", async () => {
+    vi.mocked(pickAdapter).mockImplementation(() => {
+      throw new Error("no candidates");
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await chatCommand.parseAsync(["node", "foundry", "hello"]);
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Chat failed: no candidates"));
+      expect(process.exitCode).toBe(1);
+    } finally {
+      process.exitCode = 0;
+      errorSpy.mockRestore();
     }
   });
 });
