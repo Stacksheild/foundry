@@ -17,15 +17,17 @@ vi.mock("@foundry/compute-providers", () => ({
 import { scanCommand } from "../commands/scan.js";
 import { sandboxCommand } from "../commands/sandbox.js";
 import { createCommand } from "../commands/create.js";
+import { templatesCommand } from "../commands/templates.js";
 import { devCommand } from "../commands/dev.js";
 import { runScan } from "@foundry/scanner-service";
 import { createComputeProvider } from "@foundry/compute-providers";
 
 describe("CLI command registration", () => {
-  it("registers all four top-level commands with the expected names", () => {
+  it("registers all top-level commands with the expected names", () => {
     expect(scanCommand.name()).toBe("scan");
     expect(sandboxCommand.name()).toBe("sandbox");
     expect(createCommand.name()).toBe("create");
+    expect(templatesCommand.name()).toBe("templates");
     expect(devCommand.name()).toBe("dev");
   });
 
@@ -80,7 +82,7 @@ describe("sandbox commands", () => {
 });
 
 describe("create command", () => {
-  it("copies the template into a new directory", async () => {
+  it("copies the minimal template into a new directory by default, without the manifest", async () => {
     const tmp = mkdtempSync(join(tmpdir(), "foundry-cli-test-"));
     const dest = join(tmp, "my-app");
 
@@ -89,8 +91,39 @@ describe("create command", () => {
       await createCommand.parseAsync(["node", "foundry", "my-app"]);
       expect(existsSync(join(dest, "package.json"))).toBe(true);
       expect(readFileSync(join(dest, "src/index.js"), "utf-8")).toContain("Hello from your new Foundry app");
+      expect(existsSync(join(dest, "foundry.plugin.json"))).toBe(false);
     } finally {
       cwdSpy.mockRestore();
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("scaffolds a different template via --template", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "foundry-cli-test-"));
+    const dest = join(tmp, "my-dash");
+
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmp);
+    try {
+      await createCommand.parseAsync(["node", "foundry", "my-dash", "--template", "metrics-dashboard"]);
+      expect(existsSync(join(dest, "src/server.js"))).toBe(true);
+      expect(existsSync(join(dest, "src/public/index.html"))).toBe(true);
+    } finally {
+      cwdSpy.mockRestore();
+      rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("errors clearly for an unknown template", async () => {
+    const tmp = mkdtempSync(join(tmpdir(), "foundry-cli-test-"));
+    const cwdSpy = vi.spyOn(process, "cwd").mockReturnValue(tmp);
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await createCommand.parseAsync(["node", "foundry", "my-app", "--template", "does-not-exist"]);
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Unknown template"));
+      expect(existsSync(join(tmp, "my-app"))).toBe(false);
+    } finally {
+      cwdSpy.mockRestore();
+      errorSpy.mockRestore();
       rmSync(tmp, { recursive: true, force: true });
     }
   });
@@ -108,6 +141,21 @@ describe("create command", () => {
     } finally {
       cwdSpy.mockRestore();
       rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("templates command", () => {
+  it("lists all four first-party templates", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await templatesCommand.parseAsync(["node", "foundry"]);
+      const ids = logSpy.mock.calls.map((call) => call[0].split("\t")[0]);
+      expect(ids.sort()).toEqual(
+        ["crud-admin", "metrics-dashboard", "minimal", "service-catalog-entry"].sort(),
+      );
+    } finally {
+      logSpy.mockRestore();
     }
   });
 });

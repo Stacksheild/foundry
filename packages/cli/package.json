@@ -8,7 +8,7 @@
   },
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc && cp -r src/templates dist/templates",
+    "build": "tsc && mkdir -p dist/templates && cp -r src/templates/minimal src/templates/metrics-dashboard src/templates/service-catalog-entry src/templates/crud-admin dist/templates/",
     "dev": "tsx src/index.ts",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",

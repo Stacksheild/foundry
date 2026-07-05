@@ -1,0 +1,6 @@
+{
+  "name": "metrics-dashboard",
+  "version": "0.1.0",
+  "description": "A KPI grid + bar chart dashboard starter. Zero dependencies.",
+  "type": "template"
+}

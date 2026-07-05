@@ -1,0 +1,6 @@
+{
+  "name": "crud-admin",
+  "version": "0.1.0",
+  "description": "A minimal CRUD admin panel (in-memory REST API + table UI). Zero dependencies.",
+  "type": "template"
+}

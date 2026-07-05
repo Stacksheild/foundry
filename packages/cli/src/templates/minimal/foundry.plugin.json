@@ -1,0 +1,6 @@
+{
+  "name": "minimal",
+  "version": "0.1.0",
+  "description": "A minimal Node.js starter — one file, zero dependencies.",
+  "type": "template"
+}

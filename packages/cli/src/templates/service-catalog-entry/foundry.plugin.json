@@ -1,0 +1,6 @@
+{
+  "name": "service-catalog-entry",
+  "version": "0.1.0",
+  "description": "A service catalog entry (service.yaml) with a tiny viewer page. Zero dependencies.",
+  "type": "template"
+}

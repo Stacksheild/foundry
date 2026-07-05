@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>CRUD Admin</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 32px; background: #fafafa; color: #1e1e1e; }
+      h1 { font-size: 20px; margin-bottom: 16px; }
+      table { border-collapse: collapse; width: 100%; max-width: 600px; background: #fff; border: 1px solid #e8e8e8; border-radius: 8px; overflow: hidden; margin-bottom: 16px; }
+      th, td { padding: 8px 14px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+      th { color: #888; font-weight: 600; font-size: 11px; text-transform: uppercase; }
+      form { display: flex; gap: 8px; max-width: 600px; }
+      input { flex: 1; padding: 8px 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 13px; }
+      button { padding: 8px 14px; background: #5258e4; color: #fff; border: none; border-radius: 5px; cursor: pointer; }
+      .del { background: transparent; color: #d63b2a; padding: 2px 6px; }
+    </style>
+  </head>
+  <body>
+    <h1>Items</h1>
+    <table id="table"><thead><tr><th>Name</th><th>Notes</th><th></th></tr></thead><tbody></tbody></table>
+    <form id="form">
+      <input id="name" placeholder="Name" required />
+      <input id="notes" placeholder="Notes" />
+      <button type="submit">Add</button>
+    </form>
+
+    <script>
+      const tbody = document.querySelector("#table tbody");
+
+      async function refresh() {
+        const items = await fetch("/api/items").then((r) => r.json());
+        tbody.innerHTML = items
+          .map(
+            (i) => `<tr>
+              <td>${i.name}</td>
+              <td>${i.notes}</td>
+              <td><button class="del" data-id="${i.id}">×</button></td>
+            </tr>`,
+          )
+          .join("");
+      }
+
+      document.getElementById("form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const name = document.getElementById("name").value;
+        const notes = document.getElementById("notes").value;
+        await fetch("/api/items", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ name, notes }),
+        });
+        e.target.reset();
+        refresh();
+      });
+
+      tbody.addEventListener("click", async (e) => {
+        if (!e.target.matches(".del")) return;
+        await fetch(`/api/items/${e.target.dataset.id}`, { method: "DELETE" });
+        refresh();
+      });
+
+      refresh();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,6 @@
+name: my-service
+owner: Team Alpha
+tier: tier-1
+slack: "#team-alpha-eng"
+runbook: https://runbooks.internal.example/my-service
+description: One-line description of what this service does.

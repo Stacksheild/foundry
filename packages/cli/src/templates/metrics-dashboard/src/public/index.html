@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Metrics Dashboard</title>
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; padding: 32px; background: #fafafa; color: #1e1e1e; }
+      h1 { font-size: 20px; margin-bottom: 20px; }
+      .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+      .kpi { background: #fff; border: 1px solid #e8e8e8; border-radius: 8px; padding: 14px 16px; }
+      .kpi .label { font-size: 11px; color: #888; margin-bottom: 6px; }
+      .kpi .value { font-size: 20px; font-weight: 700; }
+      .kpi .delta { font-size: 11px; color: #178b44; margin-top: 4px; }
+      .chart { background: #fff; border: 1px solid #e8e8e8; border-radius: 8px; padding: 16px; height: 160px; display: flex; align-items: flex-end; gap: 4px; }
+      .bar { flex: 1; background: #5258e4; border-radius: 2px 2px 0 0; }
+    </style>
+  </head>
+  <body>
+    <h1>Metrics Dashboard</h1>
+    <div class="kpis" id="kpis"></div>
+    <div class="chart" id="chart"></div>
+
+    <script>
+      fetch("/api/metrics")
+        .then((r) => r.json())
+        .then(({ kpis, series }) => {
+          document.getElementById("kpis").innerHTML = kpis
+            .map(
+              (k) => `<div class="kpi">
+                <div class="label">${k.label}</div>
+                <div class="value">${k.value}</div>
+                <div class="delta">${k.delta}</div>
+              </div>`,
+            )
+            .join("");
+
+          const max = Math.max(...series);
+          document.getElementById("chart").innerHTML = series
+            .map((v) => `<div class="bar" style="height:${(v / max) * 100}%"></div>`)
+            .join("");
+        });
+    </script>
+  </body>
+</html>
