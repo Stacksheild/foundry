@@ -35,10 +35,17 @@ Deploy) — see `packages/ui`.
 |---|---|---|
 | Frontend | React + Vite, Radix UI primitives + own token layer | Unstyled, accessible primitives keep the project free of any one company's design system |
 | Backend | Node (Fastify) or Go | Thin API layer; swappable |
-| Agent orchestration | Pluggable LLM adapter (OpenAI / Anthropic / local model via Ollama) | No single vendor lock-in |
+| Agent orchestration | Pluggable LLM adapter (OpenAI / Anthropic / local model via Ollama), model selection assisted by `@sentinelai/model-router` via `packages/agent-core`'s `pickAdapter()` | No single vendor lock-in; task-aware model choice instead of always defaulting to one model |
+| Security | `@sentinelai/scanner` via `packages/scanner-service`, exposed as `POST /scan` and `foundry scan` | Real vulnerability scanning for skills/MCP configs/hooks, not a mocked health check |
 | Scaffolding engine | Template-based generator (Plop/Yeoman-style) + AST codemods | Deterministic, reviewable output — not just LLM freeform text |
+| Compute / sandboxes | `packages/compute-providers` — exe.dev sandbox VMs today; AWS/Azure reserved in the type, not implemented | Provider-agnostic compute for agent-driven builds, without committing to one cloud |
 | Deploy targets | Adapters for Vercel, Fly.io, Docker/K8s, "bring your own CI" | Works without a specific cloud stack |
 | Data/state | SQLite (local/dev) → Postgres (prod) | Zero-config local dev, real DB in prod |
+
+`@sentinelai/*` is vendored as a git submodule (`vendor/sentinelai`) rather than
+an npm dependency — see the README's [External integrations](../README.md#external-integrations)
+section for why, and for the licensing note on that submodule (PolyForm
+Noncommercial, not MIT — Foundry itself stays MIT).
 
 ## 4. Phased roadmap
 
@@ -49,10 +56,12 @@ Deploy) — see `packages/ui`.
 - Convert the prototype into real React components under `packages/ui` as the visual reference implementation
 
 ### Phase 1 — 4 wks — Core scaffolding engine
-- Define a plugin manifest format (`foundry.plugin.json`) so templates for "dashboard", "CRUD app", "internal wiki" etc. are community-contributable
-- Ship 3 first-party templates: metrics dashboard, service catalog entry, CRUD admin panel
-- CLI: `npx foundry create` for local scaffolding without the web UI
-- Golden-path config: teams define their own stack defaults (framework, API base, auth) in a repo-root `foundry.config.yml`
+- **Real today:** `foundry create <name>` (via `packages/cli`) copies one static
+  built-in starter template — a genuine file copy, not a mock.
+- **Not yet built:** the plugin manifest format (`foundry.plugin.json`), multiple
+  community-contributable templates, and golden-path config (`foundry.config.yml`).
+  The one-template `create` command is the seed this phase still needs to grow into
+  a real generator + template picker.
 
 ### Phase 2 — 4 wks — Agent & build UI
 - Wire the Build screen to a real LLM adapter (streaming responses, not scripted timeline)
@@ -61,11 +70,16 @@ Deploy) — see `packages/ui`.
 - "Explain this change" + diff view before applying agent edits
 
 ### Phase 3 — 4 wks — Dashboard & deploy pipeline
-- Real app registry (Postgres) replacing mock data
-- Deploy adapters: start with Docker Compose + a generic webhook target; add Vercel/Fly adapters as plugins
-- Health checks: pluggable check runners (unit tests, bundle size, security scan via OSV/Trivy)
-- Canary rollout: real traffic-split via reverse proxy (e.g. Traefik weights) instead of a simulated progress bar
-- Auto-rollback rule engine (threshold-based, configurable per app)
+- **Real today:** the security-scan health check — `POST /scan` on `apps/api` and
+  `foundry scan` both call `@sentinelai/scanner` for genuine findings, not a
+  hardcoded "No CVEs found" string.
+- **Not yet built:** real app registry (Postgres) replacing mock dashboard data,
+  deploy adapters (Docker Compose / Vercel / Fly), the remaining pluggable check
+  runners (unit tests, bundle size), real canary traffic-split, and the
+  auto-rollback rule engine. `packages/compute-providers`' exe.dev adapter
+  (Phase-agnostic, built ahead of schedule) is the first real building block for
+  the "compute" half of this phase — deploy-target adapters are the other half,
+  still ahead.
 
 ### Phase 4 — ongoing — Community & extensibility
 - Plugin marketplace docs — how to publish a template or deploy adapter
