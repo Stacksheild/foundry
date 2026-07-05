@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@foundry/agent-core": "workspace:*",
+    "@foundry/app-registry": "workspace:*",
     "@foundry/scanner-service": "workspace:*",
     "fastify": "^5.1.0"
   },

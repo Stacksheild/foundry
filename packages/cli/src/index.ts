@@ -6,6 +6,7 @@ import { createCommand } from "./commands/create.js";
 import { templatesCommand } from "./commands/templates.js";
 import { configCommand } from "./commands/config.js";
 import { chatCommand } from "./commands/chat.js";
+import { appsCommand } from "./commands/apps.js";
 import { devCommand } from "./commands/dev.js";
 
 const program = new Command()
@@ -19,6 +20,7 @@ program.addCommand(createCommand);
 program.addCommand(templatesCommand);
 program.addCommand(configCommand);
 program.addCommand(chatCommand);
+program.addCommand(appsCommand);
 program.addCommand(devCommand);
 
 program.parse();

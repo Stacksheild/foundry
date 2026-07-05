@@ -19,12 +19,15 @@ vi.mock("@foundry/agent-core", () => ({
   pickAdapter: vi.fn(),
 }));
 
+process.env.FOUNDRY_REGISTRY_DB_PATH = ":memory:";
+
 import { scanCommand } from "../commands/scan.js";
 import { sandboxCommand } from "../commands/sandbox.js";
 import { createCommand } from "../commands/create.js";
 import { templatesCommand } from "../commands/templates.js";
 import { configCommand } from "../commands/config.js";
 import { chatCommand } from "../commands/chat.js";
+import { appsCommand } from "../commands/apps.js";
 import { devCommand } from "../commands/dev.js";
 import { runScan } from "@foundry/scanner-service";
 import { createComputeProvider } from "@foundry/compute-providers";
@@ -38,7 +41,12 @@ describe("CLI command registration", () => {
     expect(templatesCommand.name()).toBe("templates");
     expect(configCommand.name()).toBe("config");
     expect(chatCommand.name()).toBe("chat");
+    expect(appsCommand.name()).toBe("apps");
     expect(devCommand.name()).toBe("dev");
+  });
+
+  it("apps has ls/register/show subcommands", () => {
+    expect(appsCommand.commands.map((c: Command) => c.name())).toEqual(["ls", "register", "show"]);
   });
 
   it("sandbox has new/ls/rm subcommands", () => {
@@ -269,6 +277,58 @@ describe("chat command", () => {
     try {
       await chatCommand.parseAsync(["node", "foundry", "hello"]);
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("Chat failed: no candidates"));
+      expect(process.exitCode).toBe(1);
+    } finally {
+      process.exitCode = 0;
+      errorSpy.mockRestore();
+    }
+  });
+});
+
+describe("apps command", () => {
+  it("reports no apps registered yet, then registers and lists one", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await appsCommand.parseAsync(["node", "foundry", "ls"]);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("No apps registered yet"));
+
+      logSpy.mockClear();
+      await appsCommand.parseAsync(["node", "foundry", "register", "checkout-svc", "--team", "Team Alpha"]);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining("Registered checkout-svc"));
+
+      logSpy.mockClear();
+      await appsCommand.parseAsync(["node", "foundry", "ls"]);
+      const line = logSpy.mock.calls.map((c) => c[0]).join("\n");
+      expect(line).toContain("checkout-svc");
+      expect(line).toContain("Team Alpha");
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  it("show prints the full record as JSON, errors clearly for an unknown app", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await appsCommand.parseAsync(["node", "foundry", "show", "checkout-svc"]);
+      const printed = JSON.parse(logSpy.mock.calls.at(-1)?.[0] as string);
+      expect(printed.name).toBe("checkout-svc");
+
+      await appsCommand.parseAsync(["node", "foundry", "show", "does-not-exist"]);
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('No app named "does-not-exist"'));
+      expect(process.exitCode).toBe(1);
+    } finally {
+      process.exitCode = 0;
+      logSpy.mockRestore();
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("register reports a clear error for a duplicate name", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await appsCommand.parseAsync(["node", "foundry", "register", "checkout-svc"]);
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining("already registered"));
       expect(process.exitCode).toBe(1);
     } finally {
       process.exitCode = 0;

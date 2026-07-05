@@ -14,3 +14,4 @@ build/
 .vercel
 .data/
 *.db
+.claude/

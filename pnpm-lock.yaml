@@ -35,6 +35,9 @@ importers:
       '@foundry/agent-core':
         specifier: workspace:*
         version: link:../../packages/agent-core
+      '@foundry/app-registry':
+        specifier: workspace:*
+        version: link:../../packages/app-registry
       '@foundry/scanner-service':
         specifier: workspace:*
         version: link:../../packages/scanner-service
@@ -105,11 +108,26 @@ importers:
         specifier: ^3.0.0
         version: 3.2.6(@types/node@22.20.0)(jsdom@25.0.1)
 
+  packages/app-registry:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.9.0
+        version: 22.20.0
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.6(@types/node@22.20.0)(jsdom@25.0.1)
+
   packages/cli:
     dependencies:
       '@foundry/agent-core':
         specifier: workspace:*
         version: link:../agent-core
+      '@foundry/app-registry':
+        specifier: workspace:*
+        version: link:../app-registry
       '@foundry/compute-providers':
         specifier: workspace:*
         version: link:../compute-providers
