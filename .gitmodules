@@ -1,0 +1,3 @@
+[submodule "vendor/sentinelai"]
+	path = vendor/sentinelai
+	url = https://github.com/Stacksheild/sentinelai.git
