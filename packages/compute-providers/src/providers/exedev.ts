@@ -30,8 +30,8 @@ export class ExeDevProvider implements ComputeProvider {
 
   async list(): Promise<VmInfo[]> {
     const raw = await this.exec("ls --json");
-    const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
-    return parsed.map(toVmInfo);
+    const parsed = JSON.parse(raw) as { vms: Array<Record<string, unknown>> };
+    return parsed.vms.map(toVmInfo);
   }
 
   async destroy(name: string): Promise<void> {
