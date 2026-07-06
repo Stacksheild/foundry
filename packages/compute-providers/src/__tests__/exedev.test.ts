@@ -60,6 +60,24 @@ describe("ExeDevProvider", () => {
     });
   });
 
+  it("defaults region/status to \"unknown\" when the real `new --json` response omits them", async () => {
+    // Captured live from exe.dev: `new --json` doesn't report region/status
+    // the way `ls --json` does for existing VMs.
+    vi.mocked(global.fetch).mockResolvedValue(
+      jsonResponse({
+        vm_name: "foundry-probe-2",
+        https_url: "https://foundry-probe-2.exe.xyz",
+        ssh_dest: "foundry-probe-2.exe.xyz",
+      }),
+    );
+
+    const provider = new ExeDevProvider({ token: "test-token" });
+    const vm = await provider.create({ name: "foundry-probe-2" });
+
+    expect(vm.region).toBe("unknown");
+    expect(vm.status).toBe("unknown");
+  });
+
   it("parses `ls --json` into VmInfo[]", async () => {
     vi.mocked(global.fetch).mockResolvedValue(
       jsonResponse({
