@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Setting no new env var must change existing behavior: `FOUNDRY_API_TOKEN` unset → no auth check; `apiBaseUrl` prop unset → `DashboardScreen` renders `APPS_DATA` exactly as today.
+- Setting no new env var must change existing behavior: `FOUNDRY_API_TOKEN` unset → no auth check; `apiBaseUrl` prop unset → `DashboardScreen` renders `APPS_DATA` exactly as today; `FOUNDRY_DEMO_USERNAME`/`FOUNDRY_DEMO_PASSWORD` unset → `middleware.ts` is a no-op.
 - No changes to the public `foundry` Vercel project, its build config, or `DeployScreen.tsx` (the canary pipeline page).
 - Every new/changed piece of backend logic gets a `vitest` test using this repo's existing patterns (`app.inject()` for routes, `vi.mock` for `@foundry/compute-providers`, `:memory:` DB paths).
 - Full `pnpm build && pnpm typecheck && pnpm lint && pnpm test` must stay green after every task.
@@ -1354,7 +1354,164 @@ git commit -m "Thread VITE_API_BASE_URL/VITE_API_TOKEN through App.tsx to Dashbo
 
 ---
 
-### Task 9: Full workspace verification + live end-to-end smoke test
+### Task 9: Basic Auth gate (`middleware.ts`) for `foundry-live-demo`
+
+**Files:**
+- Create: `middleware.ts` (repo root — Vercel Routing Middleware must live at
+  the deployed project's root, which is the monorepo root here per the
+  existing `vercel.json`'s `outputDirectory`/`buildCommand` pair; it is not
+  inside `apps/web`).
+- Create: `middleware.test.ts` (repo root, next to it).
+- Create: `tsconfig.json` (repo root — nothing today typechecks a
+  root-level file; this extends `tsconfig.base.json` and covers just these
+  two files).
+- Create: `vitest.config.ts` (repo root).
+- Modify: root `package.json` — add `vitest` as a devDependency, and fold
+  this file's typecheck/lint/test into the existing composite scripts.
+
+**Interfaces:**
+- Consumes: `FOUNDRY_DEMO_USERNAME`/`FOUNDRY_DEMO_PASSWORD` env vars — set
+  only on the `foundry-live-demo` Vercel project (Task 11, Step 7). Unset
+  everywhere else, including the public `foundry` project.
+- Produces: a default-exported `middleware(request: Request): Response |
+  undefined` Vercel Routing Middleware entrypoint plus a `config.matcher`
+  that applies it to every route.
+
+This file ships in the same commit/deploy as the public `foundry` project
+(both projects build from this one repo), so — matching the
+`FOUNDRY_API_TOKEN` pattern from Task 4 — it **must** be a no-op whenever
+those two env vars are unset. That's what keeps the public demo untouched
+per the plan's Global Constraints, without needing a second copy of
+anything.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `middleware.test.ts`:
+
+```ts
+import { describe, it, expect, afterEach } from "vitest";
+import middleware from "./middleware.js";
+
+describe("Basic Auth gate", () => {
+  afterEach(() => {
+    delete process.env.FOUNDRY_DEMO_USERNAME;
+    delete process.env.FOUNDRY_DEMO_PASSWORD;
+  });
+
+  it("passes through when FOUNDRY_DEMO_USERNAME/PASSWORD are unset", () => {
+    const res = middleware(new Request("https://example.com/"));
+    expect(res).toBeUndefined();
+  });
+
+  it("rejects missing/wrong credentials and allows the right one when set", () => {
+    process.env.FOUNDRY_DEMO_USERNAME = "demo";
+    process.env.FOUNDRY_DEMO_PASSWORD = "secret123";
+
+    const noAuth = middleware(new Request("https://example.com/"));
+    expect(noAuth?.status).toBe(401);
+    expect(noAuth?.headers.get("www-authenticate")).toContain("Basic");
+
+    const wrongAuth = middleware(
+      new Request("https://example.com/", {
+        headers: { authorization: `Basic ${btoa("demo:wrong")}` },
+      }),
+    );
+    expect(wrongAuth?.status).toBe(401);
+
+    const rightAuth = middleware(
+      new Request("https://example.com/", {
+        headers: { authorization: `Basic ${btoa("demo:secret123")}` },
+      }),
+    );
+    expect(rightAuth).toBeUndefined();
+  });
+});
+```
+
+- [ ] **Step 2: Add the test runner**
+
+Create `vitest.config.ts`:
+
+```ts
+import { defineConfig } from "vitest/config";
+
+export default defineConfig({
+  test: {
+    include: ["*.test.ts"],
+  },
+});
+```
+
+Add `"vitest": "^3.0.0"` to root `package.json`'s (new) `devDependencies`,
+run `pnpm install`, then run: `pnpm exec vitest run`
+Expected: FAIL — `middleware.ts` doesn't exist yet.
+
+- [ ] **Step 3: Write the middleware**
+
+Create `middleware.ts`:
+
+```ts
+export default function middleware(request: Request): Response | undefined {
+  const username = process.env.FOUNDRY_DEMO_USERNAME;
+  const password = process.env.FOUNDRY_DEMO_PASSWORD;
+  if (!username || !password) return undefined;
+
+  const auth = request.headers.get("authorization");
+  if (auth?.startsWith("Basic ")) {
+    const [user, pass] = atob(auth.slice("Basic ".length)).split(":");
+    if (user === username && pass === password) return undefined;
+  }
+
+  return new Response("Authentication required", {
+    status: 401,
+    headers: { "WWW-Authenticate": 'Basic realm="foundry-live-demo"' },
+  });
+}
+
+export const config = {
+  matcher: "/(.*)",
+};
+```
+
+- [ ] **Step 4: Run the test to verify it passes**
+
+Run: `pnpm exec vitest run`
+Expected: PASS — 2 tests green.
+
+- [ ] **Step 5: Typecheck and lint**
+
+Create `tsconfig.json`:
+
+```json
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["middleware.ts", "middleware.test.ts"]
+}
+```
+
+Run: `pnpm exec tsc --noEmit -p tsconfig.json && pnpm exec eslint middleware.ts middleware.test.ts`
+Expected: both clean. Then update root `package.json`'s `typecheck`/`lint`/`test`
+scripts to run these alongside the existing recursive commands, e.g.:
+`"typecheck": "tsc --noEmit -p tsconfig.json && pnpm --filter '!./vendor/**' -r typecheck"`,
+`"lint": "eslint middleware.ts middleware.test.ts && pnpm --filter '!./vendor/**' -r lint"`,
+`"test": "vitest run && pnpm --filter '!./vendor/**' -r test"`.
+Run `pnpm typecheck && pnpm lint && pnpm test` from repo root to confirm the
+full composite commands still pass.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add middleware.ts middleware.test.ts tsconfig.json vitest.config.ts package.json pnpm-lock.yaml
+git commit -m "Add Basic Auth gate (middleware.ts) for the foundry-live-demo environment"
+```
+
+---
+
+### Task 10: Full workspace verification + live end-to-end smoke test
 
 **Files:** none (verification only).
 
@@ -1393,7 +1550,7 @@ If steps 2-3 surface anything, fix it, re-run the relevant package's tests, and 
 
 ---
 
-### Task 10: Stand up the real environment (ops — not code)
+### Task 11: Stand up the real environment (ops — not code)
 
 **Files:** none in the repo; this task provisions external infrastructure (one exe.dev VM, one Vercel project) and verifies the whole thing live. Push the branch first so the VM can pull real code.
 
@@ -1449,14 +1606,18 @@ vercel link --yes --project foundry-live-demo
 ```
 Expected: creates and links a new project named `foundry-live-demo` (confirm it's new, not the existing `foundry` project, by checking the printed project name).
 
-- [ ] **Step 7: Set env vars and enable password protection on the new project**
+- [ ] **Step 7: Set env vars, including the Basic Auth credentials for `middleware.ts` (Task 9)**
+
+Generate a password: `openssl rand -base64 18` — use its output as `<DEMO_PASSWORD>` below.
 
 ```bash
 cd /tmp/foundry-live-demo
-vercel env add VITE_API_BASE_URL production   # paste https://foundry-api-host.exe.xyz when prompted
-vercel env add VITE_API_TOKEN production       # paste <TOKEN> from Step 4 when prompted
+vercel env add VITE_API_BASE_URL production    # paste https://foundry-api-host.exe.xyz when prompted
+vercel env add VITE_API_TOKEN production        # paste <TOKEN> from Step 4 when prompted
+vercel env add FOUNDRY_DEMO_USERNAME production # e.g. "demo"
+vercel env add FOUNDRY_DEMO_PASSWORD production # paste <DEMO_PASSWORD>
 ```
-Then enable a password gate on the project (Vercel dashboard → foundry-live-demo → Settings → Deployment Protection → Password Protection, since the user asked for "even static username/password" rather than full Vercel-team SSO) — this one step has no CLI equivalent as of the currently-installed Vercel CLI version, so do it via the dashboard.
+No dashboard step needed — `middleware.ts` (Task 9) reads these at request time, so the gate is fully scriptable via the CLI and doesn't depend on Vercel's paid Password Protection/Vercel Authentication add-ons.
 
 - [ ] **Step 8: Deploy**
 
@@ -1468,7 +1629,7 @@ Expected: `READY` status, printed URL is the `foundry-live-demo` project's produ
 
 - [ ] **Step 9: Live verification**
 
-Visit the deployed URL, enter the password from Step 7, navigate to the Dashboard, confirm `demo-metrics-dashboard` and `demo-service-catalog` render with real data, click "Deploy" on one, confirm it flips to "Deploying" then "Healthy" with a real exe.dev URL. Then verify `foundry-blond.vercel.app` (the original public demo) is completely unaffected — still static, still the 6 mocked rows.
+Visit the deployed URL, enter the username/password from Step 7 in the browser's Basic Auth prompt, navigate to the Dashboard, confirm `demo-metrics-dashboard` and `demo-service-catalog` render with real data, click "Deploy" on one, confirm it flips to "Deploying" then "Healthy" with a real exe.dev URL. Then verify `foundry-blond.vercel.app` (the original public demo) is completely unaffected — still static, still the 6 mocked rows.
 
 - [ ] **Step 10: Clean up the worktree**
 

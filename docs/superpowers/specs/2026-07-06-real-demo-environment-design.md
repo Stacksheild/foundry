@@ -28,7 +28,9 @@ public static demo at all.
   and call the real deploy endpoint, gated behind a prop that's only set in
   the new environment.
 - Stand up a second Vercel project pointed at that real backend, protected by
-  Vercel Authentication.
+  a static username/password gate (HTTP Basic Auth via Vercel Routing
+  Middleware — no Vercel Pro/Enterprise "Vercel Authentication" feature
+  required).
 - Leave the existing public `foundry` Vercel project, and the scripted
   canary-rollout "Deploy screen," completely untouched.
 
@@ -51,7 +53,8 @@ public static demo at all.
 ┌─────────────────────────┐        Bearer FOUNDRY_API_TOKEN        ┌──────────────────────────┐
 │ foundry-live-demo       │ ─────────────────────────────────────▶ │ apps/api on its own      │
 │ (new Vercel project,    │  GET /apps, POST /apps/:name/deploy    │ exe.dev VM (unchanged    │
-│  Vercel Auth-gated)     │ ◀─────────────────────────────────────  │ Fastify + real SQLite)   │
+│  Basic Auth-gated via   │ ◀─────────────────────────────────────  │ Fastify + real SQLite)   │
+│  middleware.ts)         │                                        │                          │
 │ apps/web + VITE_API_*   │                                        │                          │
 └─────────────────────────┘                                        └──────────────────────────┘
 
@@ -96,13 +99,14 @@ when that env var is set**. Unset (local dev, every test today, tonight's
 manual testing) → zero behavior change. Set (on the exe.dev-hosted instance)
 → any request without a matching bearer token gets `401`.
 
-This is defense in depth, not the primary access control: Vercel
-Authentication is what actually keeps random visitors off the frontend. Since
-`apps/web` is a static SPA, this token ships inside its built JS bundle — it
-stops people who never get past Vercel Authentication from ever reaching the
-API directly (e.g. if the VM's URL leaks or gets indexed), but it does not
-hide the token from anyone who *is* let through Vercel Authentication. That
-tradeoff was discussed and accepted explicitly.
+This is defense in depth, not the primary access control: the Basic Auth
+gate described below (`## Frontend access gate`) is what actually keeps
+random visitors off the frontend. Since `apps/web` is a static SPA, this
+token ships inside its built JS bundle — it stops people who never get past
+the Basic Auth gate from ever reaching the API directly (e.g. if the VM's
+URL leaks or gets indexed), but it does not hide the token from anyone who
+*is* let through the gate. That tradeoff was discussed and accepted
+explicitly.
 
 ### CORS
 
@@ -147,6 +151,23 @@ all. It continues to render its scripted 3-stage pipeline regardless of
 environment — Foundry has no real equivalent to demo yet, and pretending
 otherwise would be dishonest.
 
+## Frontend access gate
+
+`foundry-live-demo` (the new Vercel project) gets a root-level
+`middleware.ts` using Vercel Routing Middleware (framework-agnostic, runs
+before the cache — works for a static Vite SPA same as it would for
+Next.js). It checks the request's `Authorization` header against HTTP Basic
+Auth credentials read from `FOUNDRY_DEMO_USERNAME`/`FOUNDRY_DEMO_PASSWORD`
+env vars, and returns `401` with a `WWW-Authenticate: Basic` header when
+missing or wrong, prompting the browser's native login dialog. This runs
+only in the `foundry-live-demo` project — the existing `foundry` project
+gets no `middleware.ts`, so `foundry-blond.vercel.app` is unaffected.
+
+This replaces the paid "Vercel Authentication" (Standard/Advanced
+Protection) platform feature referenced in earlier drafts: a static
+username/password is explicitly an acceptable bar for this environment, and
+avoids a plan-tier dependency.
+
 ## Deployment / operational steps (not code)
 
 1. Provision one persistent exe.dev VM running `apps/api`, with
@@ -160,7 +181,8 @@ otherwise would be dishonest.
    (`pnpm --filter @foundry/web build`, output `apps/web/dist`), plus:
    - `VITE_API_BASE_URL` = the exe.dev VM's `https_url`
    - `VITE_API_TOKEN` = the same value as that VM's `FOUNDRY_API_TOKEN`
-   - Vercel Authentication turned on in that project's settings.
+   - `FOUNDRY_DEMO_USERNAME` / `FOUNDRY_DEMO_PASSWORD` = the Basic Auth
+     credentials for the `middleware.ts` gate above.
 4. Manual end-to-end verification pass on the deployed environment: load the
    Dashboard, confirm real app rows appear, click Deploy, confirm a real
    exe.dev VM appears (`foundry sandbox ls`) and the row updates, then clean
@@ -178,6 +200,8 @@ otherwise would be dishonest.
 - `DashboardScreen`: a test asserting it still renders `APPS_DATA` verbatim
   when `apiBaseUrl` is omitted (protects the public demo's frozen behavior),
   plus a test for the live-fetch path with a mocked `fetch`.
+- Unit test for `middleware.ts`: missing/wrong credentials → `401` with
+  `WWW-Authenticate: Basic`; correct credentials → request passes through.
 - Manual live verification against the real deployed environment (per step 4
   above) before considering this done — the same bar applied to tonight's
   exe.dev fixes.
@@ -185,6 +209,11 @@ otherwise would be dishonest.
 ## Open risks (surfaced, accepted)
 
 - The `FOUNDRY_API_TOKEN` shipped in the frontend bundle is visible to anyone
-  who gets past Vercel Authentication (accepted above).
+  who gets past the Basic Auth gate (accepted above).
+- A static shared username/password is weaker than Vercel's paid
+  Authentication feature (no per-user identity, no audit log, crackable by
+  brute force since Basic Auth has no built-in rate limiting) — accepted as
+  sufficient for this demo's threat model (deterring casual/automated
+  discovery, not a determined attacker).
 - exe.dev VMs cost money/quota; the Deploy button in this environment is real
   and should only be clicked by people who understand that.
