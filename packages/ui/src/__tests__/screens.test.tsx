@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { HomeScreen } from "../screens/HomeScreen";
 import { BuildScreen } from "../screens/BuildScreen";
 import { DashboardScreen } from "../screens/DashboardScreen";
@@ -122,6 +122,63 @@ describe("DashboardScreen", () => {
 
     expect(await screen.findByText("https://live-app.exe.xyz")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/apps/live-app/deploy", expect.objectContaining({ method: "POST" }));
+
+    vi.unstubAllGlobals();
+  });
+
+  it("keeps the existing app list when the initial fetch fails", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DashboardScreen setScreen={vi.fn()} setNavActive={vi.fn()} apiBaseUrl="https://api.example.com" />);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/apps", expect.anything()),
+    );
+
+    // The failed refetch's catch block should leave the mocked initial
+    // list (there was no earlier successful fetch to fall back to).
+    expect(screen.getByText("team-productivity-dash")).toBeTruthy();
+    expect(screen.getByText("6 apps · 4 production · 1 staging · 1 dev")).toBeTruthy();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("marks the row as error when the deploy request fails", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          apps: [
+            {
+              id: 1,
+              name: "live-app",
+              env: "dev",
+              status: "healthy",
+              version: "0.2.0",
+              team: "Platform",
+              url: null,
+              vmName: null,
+              createdAt: "2026-07-06 06:00:00",
+              updatedAt: "2026-07-06 06:00:00",
+            },
+          ],
+        }),
+      })
+      .mockRejectedValueOnce(new Error("deploy failed"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DashboardScreen setScreen={vi.fn()} setNavActive={vi.fn()} apiBaseUrl="https://api.example.com" />);
+    await screen.findByText("live-app");
+
+    fireEvent.click(screen.getByRole("button", { name: "Deploy" }));
+
+    expect(await screen.findByText("Error")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/apps/live-app/deploy",
+      expect.objectContaining({ method: "POST" }),
+    );
 
     vi.unstubAllGlobals();
   });
