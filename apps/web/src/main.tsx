@@ -6,7 +6,7 @@ import "@foundry/ui/global.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <App apiBaseUrl={import.meta.env.VITE_API_BASE_URL} apiToken={import.meta.env.VITE_API_TOKEN} />
     <Analytics />
   </StrictMode>,
 );
