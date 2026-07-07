@@ -109,6 +109,10 @@ importers:
         version: 3.2.6(@types/node@22.20.0)(jsdom@25.0.1)
 
   packages/app-registry:
+    dependencies:
+      '@foundry/compute-providers':
+        specifier: workspace:*
+        version: link:../compute-providers
     devDependencies:
       '@types/node':
         specifier: ^22.9.0
