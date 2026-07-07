@@ -5,8 +5,13 @@ export default function middleware(request: Request): Response | undefined {
 
   const auth = request.headers.get("authorization");
   if (auth?.startsWith("Basic ")) {
-    const [user, pass] = atob(auth.slice("Basic ".length)).split(":");
-    if (user === username && pass === password) return undefined;
+    const decoded = atob(auth.slice("Basic ".length));
+    const sep = decoded.indexOf(":");
+    if (sep !== -1) {
+      const user = decoded.slice(0, sep);
+      const pass = decoded.slice(sep + 1);
+      if (user === username && pass === password) return undefined;
+    }
   }
 
   return new Response("Authentication required", {

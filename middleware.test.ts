@@ -34,4 +34,23 @@ describe("Basic Auth gate", () => {
     );
     expect(rightAuth).toBeUndefined();
   });
+
+  it("only splits on the first colon, so passwords containing ':' are preserved", () => {
+    process.env.FOUNDRY_DEMO_USERNAME = "demo";
+    process.env.FOUNDRY_DEMO_PASSWORD = "sec:ret:123";
+
+    const rightAuth = middleware(
+      new Request("https://example.com/", {
+        headers: { authorization: `Basic ${btoa("demo:sec:ret:123")}` },
+      }),
+    );
+    expect(rightAuth).toBeUndefined();
+
+    const truncatedGuess = middleware(
+      new Request("https://example.com/", {
+        headers: { authorization: `Basic ${btoa("demo:sec")}` },
+      }),
+    );
+    expect(truncatedGuess?.status).toBe(401);
+  });
 });
