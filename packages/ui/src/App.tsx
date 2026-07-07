@@ -6,6 +6,14 @@ import { HomeScreen } from "./screens/HomeScreen";
 import { BuildScreen } from "./screens/BuildScreen";
 import { DashboardScreen } from "./screens/DashboardScreen";
 import { DeployScreen } from "./screens/DeployScreen";
+import { LogsScreen } from "./screens/LogsScreen";
+import { AnalyticsScreen } from "./screens/AnalyticsScreen";
+import { ObservabilityScreen } from "./screens/ObservabilityScreen";
+import { EnvVarsScreen } from "./screens/EnvVarsScreen";
+import { DomainsScreen } from "./screens/DomainsScreen";
+import { IntegrationsScreen } from "./screens/IntegrationsScreen";
+import { AgentScreen } from "./screens/AgentScreen";
+import { SettingsScreen } from "./screens/SettingsScreen";
 import { tokens as T } from "./tokens";
 import type { ScreenId, Session } from "./types";
 
@@ -24,6 +32,29 @@ export const App = ({ apiBaseUrl, apiToken }: { apiBaseUrl?: string; apiToken?: 
   };
 
   const session = sessions.find((s) => s.id === current) ?? null;
+
+  const renderDashboard = () => {
+    switch (navActive) {
+      case "logs":
+        return <LogsScreen />;
+      case "analytics":
+        return <AnalyticsScreen />;
+      case "observ":
+        return <ObservabilityScreen />;
+      case "env":
+        return <EnvVarsScreen />;
+      case "domains":
+        return <DomainsScreen />;
+      case "integrations":
+        return <IntegrationsScreen />;
+      case "agent":
+        return <AgentScreen />;
+      case "settings":
+        return <SettingsScreen />;
+      default:
+        return <DashboardScreen setScreen={setScreen} setNavActive={setNavActive} apiBaseUrl={apiBaseUrl} apiToken={apiToken} />;
+    }
+  };
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", fontSize: 14, color: T.text, background: T.bg }}>
@@ -58,9 +89,7 @@ export const App = ({ apiBaseUrl, apiToken }: { apiBaseUrl?: string; apiToken?: 
               }}
             />
           )}
-          {screen === "dashboard" && (
-            <DashboardScreen setScreen={setScreen} setNavActive={setNavActive} apiBaseUrl={apiBaseUrl} apiToken={apiToken} />
-          )}
+          {screen === "dashboard" && renderDashboard()}
           {screen === "deploy" && <DeployScreen setScreen={setScreen} setNavActive={setNavActive} />}
         </main>
       </div>
