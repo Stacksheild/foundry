@@ -43,7 +43,10 @@ export const DashboardScreen = ({
   apiBaseUrl?: string;
   apiToken?: string;
 }) => {
-  const [apps, setApps] = useState<AppRecord[]>(APPS_DATA);
+  // apiBaseUrl is fixed for the lifetime of this component instance, so it's
+  // safe to use it to pick the initial state without an effect.
+  const [apps, setApps] = useState<AppRecord[]>(apiBaseUrl ? [] : APPS_DATA);
+  const [fetchError, setFetchError] = useState(false);
 
   const authHeaders = apiToken ? { Authorization: `Bearer ${apiToken}` } : undefined;
 
@@ -53,8 +56,11 @@ export const DashboardScreen = ({
       const res = await fetch(`${apiBaseUrl}/apps`, { headers: authHeaders });
       const data = (await res.json()) as { apps: ApiAppRecord[] };
       setApps(data.apps.map(toUiRecord));
+      setFetchError(false);
     } catch {
-      // leave the previous list in place on a failed refresh
+      // In live mode, surface the failure instead of silently keeping
+      // whatever was there before (there is no mock data to fall back to).
+      setFetchError(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiBaseUrl, apiToken]);
@@ -141,22 +147,40 @@ export const DashboardScreen = ({
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 22 }}>
-        {[
-          { l: "Deploy Frequency", v: "4.2 / day", d: "+12%", i: "deploy" as const },
-          { l: "Avg Lead Time", v: "3.1 hrs", d: "−18%", i: "pulse" as const },
-          { l: "Error Rate", v: "1.2%", d: "−0.4%", i: "warn" as const },
-          { l: "Apps Healthy", v: "5 / 6", d: "83%", i: "check" as const },
-        ].map((m, i) => (
-          <div key={i} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "14px 16px" }}>
-            <div style={{ fontSize: 11.5, color: T.textFaint, marginBottom: 7, display: "flex", alignItems: "center", gap: 6 }}>
-              <Icon name={m.i} size={12} color={T.textFaint} /> {m.l}
+      {!apiBaseUrl && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginBottom: 22 }}>
+          {[
+            { l: "Deploy Frequency", v: "4.2 / day", d: "+12%", i: "deploy" as const },
+            { l: "Avg Lead Time", v: "3.1 hrs", d: "−18%", i: "pulse" as const },
+            { l: "Error Rate", v: "1.2%", d: "−0.4%", i: "warn" as const },
+            { l: "Apps Healthy", v: "5 / 6", d: "83%", i: "check" as const },
+          ].map((m, i) => (
+            <div key={i} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, padding: "14px 16px" }}>
+              <div style={{ fontSize: 11.5, color: T.textFaint, marginBottom: 7, display: "flex", alignItems: "center", gap: 6 }}>
+                <Icon name={m.i} size={12} color={T.textFaint} /> {m.l}
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700 }}>{m.v}</div>
+              <div style={{ fontSize: 11.5, color: T.success, marginTop: 4 }}>{m.d} vs last week</div>
             </div>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{m.v}</div>
-            <div style={{ fontSize: 11.5, color: T.success, marginTop: 4 }}>{m.d} vs last week</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
+
+      {apiBaseUrl && fetchError && (
+        <div
+          style={{
+            background: T.dangerBg,
+            border: `1px solid ${T.danger}`,
+            color: T.danger,
+            borderRadius: 8,
+            padding: "10px 16px",
+            fontSize: 13,
+            marginBottom: 16,
+          }}
+        >
+          Couldn't reach the Foundry API — check that the backend is running, then hit Refresh.
+        </div>
+      )}
 
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden", marginBottom: 24 }}>
         <div
@@ -179,6 +203,9 @@ export const DashboardScreen = ({
           <span>URL</span>
           <span></span>
         </div>
+        {apiBaseUrl && apps.length === 0 && !fetchError && (
+          <div style={{ padding: "16px 20px", fontSize: 13, color: T.textFaint }}>Loading applications…</div>
+        )}
         {apps.map((app, i) => (
           <div
             key={app.id}
@@ -258,28 +285,32 @@ export const DashboardScreen = ({
         ))}
       </div>
 
-      <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Recent Activity</h2>
-      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
-        {[
-          { icon: "deploy" as const, msg: "customer-escalation-intel deployed to production", time: "1h ago", type: "success" as const },
-          { icon: "deploy" as const, msg: "kpi-performance-tracker promotion: staging → production (in progress)", time: "5m ago", type: "active" as const },
-          { icon: "warn" as const, msg: "feature-flag-dashboard · P95 latency spike detected (320ms)", time: "2h ago", type: "warn" as const },
-          { icon: "deploy" as const, msg: "team-productivity-dash auto-rolled back v2.3.9 (health check failed)", time: "6h ago", type: "danger" as const },
-          { icon: "sparkle" as const, msg: "Foundry Agent proposed a ticket from #analytics-support · 3 mentions", time: "3h ago", type: "info" as const },
-        ].map((ev, i) => {
-          const color = ev.type === "success" ? T.success : ev.type === "warn" ? T.warning : ev.type === "danger" ? T.danger : T.accent;
-          const bg = ev.type === "success" ? T.successBg : ev.type === "warn" ? T.warningBg : ev.type === "danger" ? T.dangerBg : T.accentBg;
-          return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", borderBottom: i < 4 ? `1px solid ${T.border}` : "none" }}>
-              <div style={{ width: 28, height: 28, borderRadius: "50%", background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Icon name={ev.icon} size={13} color={color} />
-              </div>
-              <span style={{ flex: 1, fontSize: 13, color: T.textMid }}>{ev.msg}</span>
-              <span style={{ fontSize: 12, color: T.textFaint, flexShrink: 0 }}>{ev.time}</span>
-            </div>
-          );
-        })}
-      </div>
+      {!apiBaseUrl && (
+        <>
+          <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Recent Activity</h2>
+          <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: 10, overflow: "hidden" }}>
+            {[
+              { icon: "deploy" as const, msg: "customer-escalation-intel deployed to production", time: "1h ago", type: "success" as const },
+              { icon: "deploy" as const, msg: "kpi-performance-tracker promotion: staging → production (in progress)", time: "5m ago", type: "active" as const },
+              { icon: "warn" as const, msg: "feature-flag-dashboard · P95 latency spike detected (320ms)", time: "2h ago", type: "warn" as const },
+              { icon: "deploy" as const, msg: "team-productivity-dash auto-rolled back v2.3.9 (health check failed)", time: "6h ago", type: "danger" as const },
+              { icon: "sparkle" as const, msg: "Foundry Agent proposed a ticket from #analytics-support · 3 mentions", time: "3h ago", type: "info" as const },
+            ].map((ev, i) => {
+              const color = ev.type === "success" ? T.success : ev.type === "warn" ? T.warning : ev.type === "danger" ? T.danger : T.accent;
+              const bg = ev.type === "success" ? T.successBg : ev.type === "warn" ? T.warningBg : ev.type === "danger" ? T.dangerBg : T.accentBg;
+              return (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 20px", borderBottom: i < 4 ? `1px solid ${T.border}` : "none" }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <Icon name={ev.icon} size={13} color={color} />
+                  </div>
+                  <span style={{ flex: 1, fontSize: 13, color: T.textMid }}>{ev.msg}</span>
+                  <span style={{ fontSize: 12, color: T.textFaint, flexShrink: 0 }}>{ev.time}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 };

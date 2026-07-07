@@ -76,6 +76,31 @@ describe("DashboardScreen", () => {
     vi.unstubAllGlobals();
   });
 
+  it("does not flash mock apps, metrics, or activity in live mode before the fetch resolves", async () => {
+    let resolveFetch: (v: unknown) => void = () => {};
+    const fetchMock = vi.fn().mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DashboardScreen setScreen={vi.fn()} setNavActive={vi.fn()} apiBaseUrl="https://api.example.com" />);
+
+    // Mock app rows and mock activity feed must never appear in live mode.
+    expect(screen.queryByText("team-productivity-dash")).toBeNull();
+    expect(screen.queryByText("customer-escalation-intel deployed to production")).toBeNull();
+    expect(screen.queryByText("Recent Activity")).toBeNull();
+    expect(screen.queryByText("Deploy Frequency")).toBeNull();
+    expect(screen.queryByText("Apps Healthy")).toBeNull();
+    expect(screen.getByText(/Loading applications/)).toBeTruthy();
+
+    resolveFetch({ ok: true, json: async () => ({ apps: [] }) });
+    await screen.findByText("0 apps · 0 production · 0 staging · 0 dev");
+
+    vi.unstubAllGlobals();
+  });
+
   it("calls the real deploy endpoint and updates the row on click", async () => {
     const fetchMock = vi
       .fn()
@@ -126,7 +151,7 @@ describe("DashboardScreen", () => {
     vi.unstubAllGlobals();
   });
 
-  it("keeps the existing app list when the initial fetch fails", async () => {
+  it("shows an error banner (not the mock list) when the initial fetch fails in live mode", async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -136,10 +161,48 @@ describe("DashboardScreen", () => {
       expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/apps", expect.anything()),
     );
 
-    // The failed refetch's catch block should leave the mocked initial
-    // list (there was no earlier successful fetch to fall back to).
-    expect(screen.getByText("team-productivity-dash")).toBeTruthy();
-    expect(screen.getByText("6 apps · 4 production · 1 staging · 1 dev")).toBeTruthy();
+    // A failed initial fetch must never fall back to the mocked demo data —
+    // it should surface an explicit error instead.
+    expect(await screen.findByText(/Couldn.t reach the Foundry API/)).toBeTruthy();
+    expect(screen.queryByText("team-productivity-dash")).toBeNull();
+    expect(screen.queryByText("6 apps · 4 production · 1 staging · 1 dev")).toBeNull();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("clears the error banner and shows real data after a successful refresh", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("network error"))
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          apps: [
+            {
+              id: 1,
+              name: "live-app",
+              env: "dev",
+              status: "healthy",
+              version: "0.2.0",
+              team: "Platform",
+              url: null,
+              vmName: null,
+              createdAt: "2026-07-06 06:00:00",
+              updatedAt: "2026-07-06 06:00:00",
+            },
+          ],
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DashboardScreen setScreen={vi.fn()} setNavActive={vi.fn()} apiBaseUrl="https://api.example.com" />);
+
+    expect(await screen.findByText(/Couldn.t reach the Foundry API/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+
+    expect(await screen.findByText("live-app")).toBeTruthy();
+    expect(screen.queryByText(/Couldn.t reach the Foundry API/)).toBeNull();
 
     vi.unstubAllGlobals();
   });
