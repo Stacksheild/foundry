@@ -11,7 +11,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
 
   await app.register(cors, {
-    origin: process.env.FOUNDRY_CORS_ORIGIN ? process.env.FOUNDRY_CORS_ORIGIN.split(",") : true,
+    origin: process.env.FOUNDRY_CORS_ORIGIN
+      ? process.env.FOUNDRY_CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean)
+      : true,
   });
   registerAuthHook(app);
 
