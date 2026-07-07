@@ -4,9 +4,12 @@ import { registerChatRoute } from "./routes/chat.js";
 import { registerSessionsRoutes } from "./routes/sessions.js";
 import { registerAppsRoutes } from "./routes/apps.js";
 import { registerDeployRoute } from "./routes/deploy.js";
+import { registerAuthHook } from "./authHook.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
+
+  registerAuthHook(app);
 
   app.get("/health", async () => ({ status: "ok" }));
   await app.register(registerScanRoute);

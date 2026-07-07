@@ -38,6 +38,9 @@ importers:
       '@foundry/app-registry':
         specifier: workspace:*
         version: link:../../packages/app-registry
+      '@foundry/compute-providers':
+        specifier: workspace:*
+        version: link:../../packages/compute-providers
       '@foundry/scanner-service':
         specifier: workspace:*
         version: link:../../packages/scanner-service
