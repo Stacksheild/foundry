@@ -3,6 +3,7 @@ import { registerScanRoute } from "./routes/scan.js";
 import { registerChatRoute } from "./routes/chat.js";
 import { registerSessionsRoutes } from "./routes/sessions.js";
 import { registerAppsRoutes } from "./routes/apps.js";
+import { registerDeployRoute } from "./routes/deploy.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
@@ -12,6 +13,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(registerChatRoute);
   await app.register(registerSessionsRoutes);
   await app.register(registerAppsRoutes);
+  await app.register(registerDeployRoute);
 
   return app;
 }
