@@ -9,9 +9,9 @@
     "build:vendor": "pnpm --filter @sentinelai/core --filter @sentinelai/model-router --filter @sentinelai/scanner build",
     "build:libs": "pnpm --filter @foundry/agent-core --filter @foundry/scanner-service --filter @foundry/compute-providers --filter @foundry/app-registry --filter @foundry/health-checks build",
     "build": "pnpm --filter '!./vendor/**' -r build",
-    "lint": "pnpm --filter '!./vendor/**' -r lint",
-    "typecheck": "pnpm --filter '!./vendor/**' -r typecheck",
-    "test": "pnpm --filter '!./vendor/**' -r test"
+    "lint": "eslint middleware.ts middleware.test.ts && pnpm --filter '!./vendor/**' -r lint",
+    "typecheck": "tsc --noEmit -p tsconfig.json && pnpm --filter '!./vendor/**' -r typecheck",
+    "test": "vitest run && pnpm --filter '!./vendor/**' -r test"
   },
   "packageManager": "pnpm@10.33.2",
   "engines": {
@@ -24,6 +24,7 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "globals": "^15.11.0",
     "typescript": "^5.6.3",
-    "typescript-eslint": "^8.13.0"
+    "typescript-eslint": "^8.13.0",
+    "vitest": "^3.0.0"
   }
 }

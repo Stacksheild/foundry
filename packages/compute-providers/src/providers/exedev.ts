@@ -30,8 +30,8 @@ export class ExeDevProvider implements ComputeProvider {
 
   async list(): Promise<VmInfo[]> {
     const raw = await this.exec("ls --json");
-    const parsed = JSON.parse(raw) as Array<Record<string, unknown>>;
-    return parsed.map(toVmInfo);
+    const parsed = JSON.parse(raw) as { vms: Array<Record<string, unknown>> };
+    return parsed.vms.map(toVmInfo);
   }
 
   async destroy(name: string): Promise<void> {
@@ -99,12 +99,16 @@ function shellEscape(value: string): string {
   return `"${value.replace(/(["\\$`])/g, "\\$1")}"`;
 }
 
+// exe.dev's real `new --json` response omits region/status entirely (only
+// `ls --json` reports them per-VM) — String(undefined) would otherwise
+// silently produce the literal text "undefined" instead of surfacing that
+// the API just didn't say.
 function toVmInfo(raw: Record<string, unknown>): VmInfo {
   return {
     name: String(raw.vm_name),
     httpsUrl: String(raw.https_url),
-    region: String(raw.region),
-    status: String(raw.status),
+    region: raw.region !== undefined ? String(raw.region) : "unknown",
+    status: raw.status !== undefined ? String(raw.status) : "unknown",
     sshDest: String(raw.ssh_dest),
   };
 }

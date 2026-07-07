@@ -12,3 +12,4 @@ export {
   type RegisterAppInput,
   type UpdateAppInput,
 } from "./db.js";
+export { deployApp, AppNotFoundError, type DeployOptions } from "./deploy.js";

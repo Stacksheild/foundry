@@ -18,6 +18,7 @@ export interface AppRecord {
   deploy: string;
   team: string;
   ver: string;
+  url?: string;
 }
 
 export interface Suggestion {

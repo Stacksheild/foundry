@@ -9,7 +9,7 @@ import { DeployScreen } from "./screens/DeployScreen";
 import { tokens as T } from "./tokens";
 import type { ScreenId, Session } from "./types";
 
-export const App = () => {
+export const App = ({ apiBaseUrl, apiToken }: { apiBaseUrl?: string; apiToken?: string } = {}) => {
   const [screen, setScreen] = useState<ScreenId>("home");
   const [sessions, setSessions] = useState<Session[]>([]);
   const [current, setCurrent] = useState<number | null>(null);
@@ -58,7 +58,9 @@ export const App = () => {
               }}
             />
           )}
-          {screen === "dashboard" && <DashboardScreen setScreen={setScreen} setNavActive={setNavActive} />}
+          {screen === "dashboard" && (
+            <DashboardScreen setScreen={setScreen} setNavActive={setNavActive} apiBaseUrl={apiBaseUrl} apiToken={apiToken} />
+          )}
           {screen === "deploy" && <DeployScreen setScreen={setScreen} setNavActive={setNavActive} />}
         </main>
       </div>

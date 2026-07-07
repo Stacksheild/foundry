@@ -11,8 +11,10 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fastify/cors": "^11.2.0",
     "@foundry/agent-core": "workspace:*",
     "@foundry/app-registry": "workspace:*",
+    "@foundry/compute-providers": "workspace:*",
     "@foundry/scanner-service": "workspace:*",
     "fastify": "^5.1.0"
   },

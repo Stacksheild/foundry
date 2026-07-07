@@ -121,6 +121,7 @@ describe("create command", () => {
       expect(existsSync(join(dest, "package.json"))).toBe(true);
       expect(readFileSync(join(dest, "src/index.js"), "utf-8")).toContain("Hello from your new Foundry app");
       expect(existsSync(join(dest, "foundry.plugin.json"))).toBe(false);
+      expect(JSON.parse(readFileSync(join(dest, "package.json"), "utf-8")).name).toBe("my-app");
     } finally {
       cwdSpy.mockRestore();
       rmSync(tmp, { recursive: true, force: true });
