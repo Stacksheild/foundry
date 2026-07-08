@@ -64,6 +64,20 @@ describe("POST /build/chat — enabled", () => {
     expect(res.headers["x-foundry-session-id"]).toBeDefined();
   });
 
+  it("carries CORS headers onto the raw streamed response (browsers block it otherwise)", async () => {
+    mockAdapter.stream.mockReturnValue(fakeStream(["Hi"]));
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/build/chat",
+      headers: { origin: "https://foundry-live-demo.vercel.app" },
+      payload: { messages: [{ role: "user", content: "hi" }] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["access-control-allow-origin"]).toBe("https://foundry-live-demo.vercel.app");
+  });
+
   it("persists the user + assistant turn to a real session, retrievable via /build/sessions", async () => {
     mockAdapter.stream.mockReturnValue(fakeStream(["Real", " reply"]));
 

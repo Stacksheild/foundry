@@ -52,7 +52,15 @@ export async function registerChatRoute(app: FastifyInstance): Promise<void> {
       sessionId ?? createSession(db, makeTitle(lastUserMessage?.content ?? ""), lastUserMessage?.content ?? "");
     if (lastUserMessage) appendMessage(db, activeSessionId, lastUserMessage.role, lastUserMessage.content);
 
+    // Writing to reply.raw bypasses Fastify's reply lifecycle, so headers
+    // accumulated by plugins — crucially @fastify/cors's
+    // Access-Control-Allow-Origin, without which browsers block the stream —
+    // must be carried over explicitly.
+    const accumulatedHeaders = Object.fromEntries(
+      Object.entries(reply.getHeaders()).filter(([, v]) => v !== undefined),
+    ) as Record<string, string | number | string[]>;
     reply.raw.writeHead(200, {
+      ...accumulatedHeaders,
       "content-type": "text/plain; charset=utf-8",
       "x-foundry-session-id": String(activeSessionId),
     });
