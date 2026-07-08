@@ -73,6 +73,119 @@ describe("BuildScreen", () => {
   });
 });
 
+function makeStreamResponse(chunks: string[], sessionId: number) {
+  const encoder = new TextEncoder();
+  let i = 0;
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: (name: string) => (name === "x-foundry-session-id" ? String(sessionId) : null) },
+    body: {
+      getReader: () => ({
+        read: async () => {
+          if (i < chunks.length) {
+            const value = encoder.encode(chunks[i]);
+            i++;
+            return { value, done: false };
+          }
+          return { value: undefined, done: true };
+        },
+      }),
+    },
+  };
+}
+
+describe("BuildScreen — live mode (apiBaseUrl set)", () => {
+  it("sends the POST with a bearer header and renders streamed chunks progressively", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeStreamResponse(["Hel", "lo"], 42));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <BuildScreen session={null} onPromote={vi.fn()} apiBaseUrl="https://api.example.com" apiToken="tok" />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Ask the Foundry agent…"), {
+      target: { value: "Build a dashboard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Hello")).toBeTruthy();
+    expect(screen.getByText("Build a dashboard")).toBeTruthy();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/build/chat",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ Authorization: "Bearer tok", "content-type": "application/json" }),
+        body: JSON.stringify({ messages: [{ role: "user", content: "Build a dashboard" }], sessionId: undefined }),
+      }),
+    );
+
+    vi.unstubAllGlobals();
+  });
+
+  it("auto-sends a prompt handed off from the Home screen as the opening message", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeStreamResponse(["On it"], 7));
+    vi.stubGlobal("fetch", fetchMock);
+    const consumed = vi.fn();
+
+    render(
+      <BuildScreen
+        session={null}
+        onPromote={vi.fn()}
+        apiBaseUrl="https://api.example.com"
+        apiToken="tok"
+        initialPrompt="Build an approvals app"
+        onInitialPromptConsumed={consumed}
+      />,
+    );
+
+    expect(await screen.findByText("On it")).toBeTruthy();
+    expect(screen.getByText("Build an approvals app")).toBeTruthy();
+    expect(consumed).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/build/chat",
+      expect.objectContaining({
+        body: JSON.stringify({ messages: [{ role: "user", content: "Build an approvals app" }], sessionId: undefined }),
+      }),
+    );
+
+    vi.unstubAllGlobals();
+  });
+
+  it("shows an inline error bubble when the chat request fails", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<BuildScreen session={null} onPromote={vi.fn()} apiBaseUrl="https://api.example.com" apiToken="tok" />);
+
+    fireEvent.change(screen.getByPlaceholderText("Ask the Foundry agent…"), {
+      target: { value: "Build a dashboard" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText(/Couldn.t reach the Foundry agent/)).toBeTruthy();
+
+    vi.unstubAllGlobals();
+  });
+
+  it("does not render the scripted narration or the Promote/IDE/Share buttons", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeStreamResponse(["Hi"], 1));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<BuildScreen session={null} onPromote={vi.fn()} apiBaseUrl="https://api.example.com" apiToken="tok" />);
+
+    expect(screen.queryByRole("button", { name: /Promote to Staging/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit in IDE" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Share" })).toBeNull();
+    expect(screen.queryByText("Reading codebase context & service catalog")).toBeNull();
+    expect(screen.queryByText("Team Productivity Insights")).toBeNull();
+
+    vi.unstubAllGlobals();
+  });
+});
+
 describe("DashboardScreen", () => {
   it("renders the mocked applications table when apiBaseUrl is not set", () => {
     render(<DashboardScreen setScreen={vi.fn()} setNavActive={vi.fn()} />);

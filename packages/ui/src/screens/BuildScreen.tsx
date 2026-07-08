@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { tokens as T } from "../tokens";
 import { Icon } from "../icons";
 import type { Session } from "../types";
@@ -166,7 +166,258 @@ const MiniPreviewDash = () => (
   </div>
 );
 
+interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+const LIVE_CHAT_ERROR = "Couldn't reach the Foundry agent — check that the backend is running";
+
+function makeSessionTitle(prompt: string): string {
+  return prompt.length > 46 ? `${prompt.slice(0, 43)}…` : prompt;
+}
+
+/**
+ * Real chat experience for live mode (apiBaseUrl set) — no scripted
+ * narration, no fake preview panel, no buttons for functionality that
+ * doesn't exist yet. Just a message thread wired to POST /build/chat.
+ */
+const LiveBuildScreen = ({
+  session,
+  apiBaseUrl,
+  apiToken,
+  onSessionCreated,
+  initialPrompt,
+  onInitialPromptConsumed,
+}: {
+  session: Session | null;
+  apiBaseUrl: string;
+  apiToken?: string;
+  onSessionCreated?: (session: { id: number; title: string; prompt: string }) => void;
+  initialPrompt?: string | null;
+  onInitialPromptConsumed?: () => void;
+}) => {
+  const [messages, setMessages] = useState<ChatTurn[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [backendSessionId, setBackendSessionId] = useState<number | null>(session?.id ?? null);
+
+  const authHeaders: Record<string, string> = apiToken ? { Authorization: `Bearer ${apiToken}` } : {};
+
+  useEffect(() => {
+    setMessages([]);
+    setError(null);
+    setBackendSessionId(session?.id ?? null);
+    if (!session) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/build/sessions/${session.id}`, { headers: authHeaders });
+        if (!res.ok) throw new Error(`history fetch failed: ${res.status}`);
+        const data = (await res.json()) as { messages: { role: string; content: string }[] };
+        if (!cancelled) {
+          setMessages(data.messages.map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content })));
+        }
+      } catch {
+        if (!cancelled) setError(LIVE_CHAT_ERROR);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id, apiBaseUrl, apiToken]);
+
+  const sendMessage = async (content: string) => {
+    if (!content || sending) return;
+
+    const newMessages: ChatTurn[] = [...messages, { role: "user", content }];
+    const isFirstMessage = backendSessionId === null;
+    setMessages(newMessages);
+    setInput("");
+    setError(null);
+    setSending(true);
+
+    try {
+      const res = await fetch(`${apiBaseUrl}/build/chat`, {
+        method: "POST",
+        headers: { ...authHeaders, "content-type": "application/json" },
+        body: JSON.stringify({ messages: newMessages, sessionId: backendSessionId ?? undefined }),
+      });
+      if (!res.ok || !res.body) throw new Error(`chat request failed: ${res.status}`);
+
+      const newSessionId = res.headers.get("x-foundry-session-id");
+      if (newSessionId) setBackendSessionId(Number(newSessionId));
+
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        setMessages((prev) => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          next[next.length - 1] = { ...last, content: last.content + chunk };
+          return next;
+        });
+      }
+
+      if (isFirstMessage && newSessionId) {
+        onSessionCreated?.({ id: Number(newSessionId), title: makeSessionTitle(content), prompt: content });
+      }
+    } catch {
+      setError(LIVE_CHAT_ERROR);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const send = () => {
+    const content = input.trim();
+    if (!content) return;
+    setInput("");
+    void sendMessage(content);
+  };
+
+  // A prompt typed on the Home screen arrives as initialPrompt — auto-send it
+  // as the opening message of a fresh session (once; ref guards StrictMode's
+  // double effect invocation).
+  const autoSentRef = useRef(false);
+  useEffect(() => {
+    if (!initialPrompt || session || autoSentRef.current) return;
+    autoSentRef.current = true;
+    onInitialPromptConsumed?.();
+    void sendMessage(initialPrompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt, session]);
+
+  return (
+    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: T.bg }}>
+      <div
+        style={{
+          padding: "10px 16px",
+          borderBottom: `1px solid ${T.border}`,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          fontSize: 13,
+          fontWeight: 600,
+        }}
+      >
+        <Icon name="sparkle" size={13} color={T.accent} />
+        <span>{session ? session.title : "New Session"}</span>
+      </div>
+
+      <div style={{ flex: 1, overflow: "auto", padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+        {messages.map((m, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start" }}>
+            <div
+              style={{
+                background: m.role === "user" ? T.accent : T.surface,
+                color: m.role === "user" ? "#fff" : T.text,
+                border: m.role === "user" ? "none" : `1px solid ${T.border}`,
+                padding: "10px 14px",
+                borderRadius: m.role === "user" ? "12px 12px 2px 12px" : "12px 12px 12px 2px",
+                fontSize: 13.5,
+                maxWidth: "70%",
+                lineHeight: 1.45,
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {m.content}
+            </div>
+          </div>
+        ))}
+        {error && (
+          <div style={{ display: "flex", justifyContent: "flex-start" }}>
+            <div
+              style={{
+                background: T.dangerBg,
+                color: T.danger,
+                border: `1px solid ${T.danger}`,
+                padding: "10px 14px",
+                borderRadius: 8,
+                fontSize: 13.5,
+                maxWidth: "70%",
+              }}
+            >
+              {error}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ padding: 12, borderTop: `1px solid ${T.border}` }}>
+        <div style={{ display: "flex", border: `1px solid ${T.border}`, borderRadius: 7, overflow: "hidden", background: T.bg }}>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && send()}
+            placeholder="Ask the Foundry agent…"
+            disabled={sending}
+            style={{ flex: 1, padding: "9px 12px", border: "none", outline: "none", fontSize: 13 }}
+          />
+          <button
+            onClick={send}
+            disabled={sending}
+            aria-label="Send"
+            style={{
+              padding: "0 14px",
+              background: T.accent,
+              border: "none",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            <Icon name="send" size={14} color="#fff" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const BuildScreen = ({
+  session,
+  onPromote,
+  apiBaseUrl,
+  apiToken,
+  onSessionCreated,
+  initialPrompt,
+  onInitialPromptConsumed,
+}: {
+  session: Session | null;
+  onPromote: () => void;
+  apiBaseUrl?: string;
+  apiToken?: string;
+  onSessionCreated?: (session: { id: number; title: string; prompt: string }) => void;
+  initialPrompt?: string | null;
+  onInitialPromptConsumed?: () => void;
+}) => {
+  if (apiBaseUrl) {
+    return (
+      <LiveBuildScreen
+        session={session}
+        apiBaseUrl={apiBaseUrl}
+        apiToken={apiToken}
+        onSessionCreated={onSessionCreated}
+        initialPrompt={initialPrompt}
+        onInitialPromptConsumed={onInitialPromptConsumed}
+      />
+    );
+  }
+
+  return <ScriptedBuildScreen session={session} onPromote={onPromote} />;
+};
+
+const ScriptedBuildScreen = ({
   session,
   onPromote,
 }: {

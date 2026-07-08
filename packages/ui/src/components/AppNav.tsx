@@ -26,10 +26,12 @@ export const AppNav = ({
   active,
   setActive,
   setScreen,
+  live,
 }: {
   active: string;
   setActive: (id: string) => void;
   setScreen: (s: ScreenId) => void;
+  live?: boolean;
 }) => (
   <nav
     style={{
@@ -41,7 +43,7 @@ export const AppNav = ({
       overflowY: "auto",
     }}
   >
-    {APP_NAV_ITEMS.map((item) => (
+    {(live ? APP_NAV_ITEMS.filter((item) => item.id === "overview") : APP_NAV_ITEMS).map((item) => (
       <button
         key={item.id}
         onClick={() => {

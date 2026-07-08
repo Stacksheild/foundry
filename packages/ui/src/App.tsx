@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Header } from "./components/Header";
 import { SessionSidebar } from "./components/SessionSidebar";
 import { AppNav } from "./components/AppNav";
@@ -15,20 +15,65 @@ import { IntegrationsScreen } from "./screens/IntegrationsScreen";
 import { AgentScreen } from "./screens/AgentScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { tokens as T } from "./tokens";
+import { formatRelativeTime } from "./lib/relativeTime";
 import type { ScreenId, Session } from "./types";
+
+interface ApiChatSession {
+  id: number;
+  title: string;
+  prompt: string;
+  createdAt: string;
+}
 
 export const App = ({ apiBaseUrl, apiToken }: { apiBaseUrl?: string; apiToken?: string } = {}) => {
   const [screen, setScreen] = useState<ScreenId>("home");
   const [sessions, setSessions] = useState<Session[]>([]);
   const [current, setCurrent] = useState<number | null>(null);
   const [navActive, setNavActive] = useState("overview");
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!apiBaseUrl) return;
+    const authHeaders = apiToken ? { Authorization: `Bearer ${apiToken}` } : undefined;
+    (async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/build/sessions`, { headers: authHeaders });
+        const data = (await res.json()) as { sessions: ApiChatSession[] };
+        setSessions(
+          data.sessions.map((s) => ({
+            id: s.id,
+            title: s.title,
+            prompt: s.prompt,
+            time: formatRelativeTime(s.createdAt),
+          })),
+        );
+      } catch {
+        // Live mode with no reachable backend: keep an empty sidebar rather
+        // than crash or fall back to mock sessions.
+      }
+    })();
+  }, [apiBaseUrl, apiToken]);
 
   const handleSubmit = (prompt: string) => {
+    if (apiBaseUrl) {
+      // Live mode: BuildScreen auto-sends the typed prompt as the opening
+      // message of a real session, then reports the created session back
+      // via onSessionCreated.
+      setPendingPrompt(prompt);
+      setCurrent(null);
+      setScreen("build");
+      return;
+    }
     const title = prompt.length > 46 ? prompt.slice(0, 43) + "…" : prompt;
     const s: Session = { id: Date.now(), title, prompt, time: "Just now" };
     setSessions((prev) => [s, ...prev]);
     setCurrent(s.id);
     setScreen("build");
+  };
+
+  const handleSessionCreated = (created: { id: number; title: string; prompt: string }) => {
+    setSessions((prev) => [{ id: created.id, title: created.title, prompt: created.prompt, time: "just now" }, ...prev]);
+    setCurrent(created.id);
   };
 
   const session = sessions.find((s) => s.id === current) ?? null;
@@ -58,7 +103,7 @@ export const App = ({ apiBaseUrl, apiToken }: { apiBaseUrl?: string; apiToken?: 
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", fontSize: 14, color: T.text, background: T.bg }}>
-      <Header screen={screen} setScreen={setScreen} />
+      <Header screen={screen} setScreen={setScreen} live={Boolean(apiBaseUrl)} />
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
         {(screen === "home" || screen === "build") && (
           <SessionSidebar
@@ -75,7 +120,7 @@ export const App = ({ apiBaseUrl, apiToken }: { apiBaseUrl?: string; apiToken?: 
           />
         )}
         {(screen === "dashboard" || screen === "deploy") && (
-          <AppNav active={navActive} setActive={setNavActive} setScreen={setScreen} />
+          <AppNav active={navActive} setActive={setNavActive} setScreen={setScreen} live={Boolean(apiBaseUrl)} />
         )}
         <main style={{ flex: 1, display: "flex", overflow: "hidden" }}>
           {screen === "home" && <HomeScreen onSubmit={handleSubmit} />}
@@ -83,6 +128,11 @@ export const App = ({ apiBaseUrl, apiToken }: { apiBaseUrl?: string; apiToken?: 
             <BuildScreen
               key={current ?? "new"}
               session={session}
+              apiBaseUrl={apiBaseUrl}
+              apiToken={apiToken}
+              onSessionCreated={handleSessionCreated}
+              initialPrompt={pendingPrompt}
+              onInitialPromptConsumed={() => setPendingPrompt(null)}
               onPromote={() => {
                 setScreen("deploy");
                 setNavActive("deployments");

@@ -34,9 +34,14 @@ export async function registerChatRoute(app: FastifyInstance): Promise<void> {
 
     let adapter;
     try {
-      adapter = provider
-        ? createAdapter(provider, { model })
-        : pickAdapter({ taskType: taskType as never, prompt: messages.at(-1)?.content }).adapter;
+      const envProvider = process.env.FOUNDRY_DEFAULT_PROVIDER as Provider | undefined;
+      if (provider) {
+        adapter = createAdapter(provider, { model });
+      } else if (envProvider) {
+        adapter = createAdapter(envProvider, { model: model ?? process.env.FOUNDRY_DEFAULT_MODEL });
+      } else {
+        adapter = pickAdapter({ taskType: taskType as never, prompt: messages.at(-1)?.content }).adapter;
+      }
     } catch (err) {
       return reply.code(422).send({ error: err instanceof Error ? err.message : "failed to select a model" });
     }

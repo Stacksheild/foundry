@@ -29,6 +29,17 @@ describe("CORS", () => {
     await app.close();
   });
 
+  it("exposes x-foundry-session-id so browsers can read it from cross-origin chat responses", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/apps",
+      headers: { origin: "https://foundry-live-demo.vercel.app" },
+    });
+    expect(res.headers["access-control-expose-headers"]).toContain("x-foundry-session-id");
+    await app.close();
+  });
+
   it("trims whitespace and filters empty entries in FOUNDRY_CORS_ORIGIN", async () => {
     process.env.FOUNDRY_CORS_ORIGIN = "https://a.example.com, https://b.example.com,";
     const app = await buildApp();
