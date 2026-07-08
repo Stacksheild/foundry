@@ -40,4 +40,14 @@ describe("FOUNDRY_API_TOKEN gating", () => {
     expect(res.statusCode).toBe(200);
     await app.close();
   });
+
+  it("never gates GET / and returns a friendly service banner, even when a token is set", async () => {
+    process.env.FOUNDRY_API_TOKEN = "secret123";
+    const app = await buildApp();
+    const res = await app.inject({ method: "GET", url: "/" });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ service: "foundry-api", status: "ok" });
+    expect(res.json().hint).toContain("Bearer");
+    await app.close();
+  });
 });

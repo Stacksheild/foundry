@@ -17,6 +17,11 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
   registerAuthHook(app);
 
+  app.get("/", async () => ({
+    service: "foundry-api",
+    status: "ok",
+    hint: "This is Foundry's backend API. Endpoints require an Authorization: Bearer token — the demo UI at foundry-live-demo.vercel.app supplies it for you. Liveness: GET /health.",
+  }));
   app.get("/health", async () => ({ status: "ok" }));
   await app.register(registerScanRoute);
   await app.register(registerChatRoute);
