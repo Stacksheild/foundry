@@ -1,0 +1,100 @@
+name: Release
+
+# Pushing a tag like v0.1.0 builds downloadable artifacts, publishes a GitHub
+# Release, and (when VERCEL_TOKEN is set) redeploys the public demo at that
+# exact tag. Cut a release with:
+#   git tag v0.1.0 && git push origin v0.1.0
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:vendor
+      - run: pnpm build:libs
+      - run: pnpm --filter @foundry/cli build
+      - run: pnpm --filter @foundry/web build
+
+      - name: Package the CLI (self-contained, runs with Node 22+)
+        run: |
+          pnpm --filter @foundry/cli deploy --legacy --prod out/foundry-cli
+          cat > out/foundry-cli/README.txt <<'EOF'
+          Foundry CLI — self-contained bundle (requires Node.js 22+)
+
+          Run it:   node foundry-cli/dist/index.js --help
+          Optional: alias foundry='node /path/to/foundry-cli/dist/index.js'
+          EOF
+          tar -czf "foundry-cli-${GITHUB_REF_NAME}.tar.gz" -C out foundry-cli
+
+      - name: Package the demo environment (static site, host anywhere)
+        run: |
+          cp -r apps/web/dist out/foundry-demo
+          cat > out/foundry-demo/README.txt <<'EOF'
+          Foundry demo UI — static build of apps/web.
+
+          Serve this folder with any static file server, e.g.:
+            npx serve foundry-demo
+          Optionally point it at a real Foundry API by rebuilding with
+          VITE_API_BASE_URL / VITE_API_TOKEN set (see apps/web/.env.example).
+          EOF
+          tar -czf "foundry-demo-static-${GITHUB_REF_NAME}.tar.gz" -C out foundry-demo
+
+      - name: Checksums
+        run: sha256sum foundry-cli-*.tar.gz foundry-demo-static-*.tar.gz > checksums.txt
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Foundry $GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes "Live demo: https://foundry-blond.vercel.app
+
+          **Artifacts**
+          - \`foundry-cli-$GITHUB_REF_NAME.tar.gz\` — self-contained CLI bundle (needs Node 22+): \`tar xzf\` it, then \`node foundry-cli/dist/index.js --help\`
+          - \`foundry-demo-static-$GITHUB_REF_NAME.tar.gz\` — the demo UI as a static site you can host anywhere
+          - \`checksums.txt\` — SHA-256 of both" \
+            "foundry-cli-$GITHUB_REF_NAME.tar.gz" \
+            "foundry-demo-static-$GITHUB_REF_NAME.tar.gz" \
+            checksums.txt
+
+  deploy-demo:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      # Same gate as deploy-demo.yml: a no-op until the VERCEL_TOKEN repo
+      # secret exists, then tagged releases redeploy the public demo too.
+      - name: Check for deploy token
+        id: gate
+        run: |
+          if [ -n "$VERCEL_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::VERCEL_TOKEN secret not set — release will not redeploy the demo."
+          fi
+      - uses: actions/checkout@v5
+        if: steps.gate.outputs.enabled == 'true'
+      - run: npm install --global vercel@latest
+        if: steps.gate.outputs.enabled == 'true'
+      - run: vercel deploy --prod --yes --token="$VERCEL_TOKEN"
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

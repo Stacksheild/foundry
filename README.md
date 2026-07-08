@@ -48,8 +48,14 @@ Open **http://localhost:5173** — you'll see the same UI as the online demo.
 ## Going deeper: the real backend & CLI
 
 The web demo is the visual layer. The real functionality (security scanning,
-sandbox VMs, app registry, deploys, LLM chat) lives in the CLI and API. One
-extra build step unlocks them:
+sandbox VMs, app registry, deploys, LLM chat) lives in the CLI and API.
+
+**No repo checkout needed:** every [GitHub Release](https://github.com/Stacksheild/foundry/releases)
+ships a self-contained CLI bundle (`foundry-cli-*.tar.gz`, needs Node 22+ —
+unpack and run `node foundry-cli/dist/index.js --help`) and the demo UI as a
+host-anywhere static site (`foundry-demo-static-*.tar.gz`).
+
+Or build from the repo — one extra step unlocks everything:
 
 ```bash
 pnpm build:vendor && pnpm build:libs        # build the backend packages
