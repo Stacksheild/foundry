@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { tokens as T } from "../tokens";
 import { Icon } from "../icons";
 import type { Session } from "../types";
@@ -187,11 +187,15 @@ const LiveBuildScreen = ({
   apiBaseUrl,
   apiToken,
   onSessionCreated,
+  initialPrompt,
+  onInitialPromptConsumed,
 }: {
   session: Session | null;
   apiBaseUrl: string;
   apiToken?: string;
   onSessionCreated?: (session: { id: number; title: string; prompt: string }) => void;
+  initialPrompt?: string | null;
+  onInitialPromptConsumed?: () => void;
 }) => {
   const [messages, setMessages] = useState<ChatTurn[]>([]);
   const [input, setInput] = useState("");
@@ -227,8 +231,7 @@ const LiveBuildScreen = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.id, apiBaseUrl, apiToken]);
 
-  const send = async () => {
-    const content = input.trim();
+  const sendMessage = async (content: string) => {
     if (!content || sending) return;
 
     const newMessages: ChatTurn[] = [...messages, { role: "user", content }];
@@ -273,6 +276,25 @@ const LiveBuildScreen = ({
       setSending(false);
     }
   };
+
+  const send = () => {
+    const content = input.trim();
+    if (!content) return;
+    setInput("");
+    void sendMessage(content);
+  };
+
+  // A prompt typed on the Home screen arrives as initialPrompt — auto-send it
+  // as the opening message of a fresh session (once; ref guards StrictMode's
+  // double effect invocation).
+  const autoSentRef = useRef(false);
+  useEffect(() => {
+    if (!initialPrompt || session || autoSentRef.current) return;
+    autoSentRef.current = true;
+    onInitialPromptConsumed?.();
+    void sendMessage(initialPrompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt, session]);
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: T.bg }}>
@@ -368,16 +390,27 @@ export const BuildScreen = ({
   apiBaseUrl,
   apiToken,
   onSessionCreated,
+  initialPrompt,
+  onInitialPromptConsumed,
 }: {
   session: Session | null;
   onPromote: () => void;
   apiBaseUrl?: string;
   apiToken?: string;
   onSessionCreated?: (session: { id: number; title: string; prompt: string }) => void;
+  initialPrompt?: string | null;
+  onInitialPromptConsumed?: () => void;
 }) => {
   if (apiBaseUrl) {
     return (
-      <LiveBuildScreen session={session} apiBaseUrl={apiBaseUrl} apiToken={apiToken} onSessionCreated={onSessionCreated} />
+      <LiveBuildScreen
+        session={session}
+        apiBaseUrl={apiBaseUrl}
+        apiToken={apiToken}
+        onSessionCreated={onSessionCreated}
+        initialPrompt={initialPrompt}
+        onInitialPromptConsumed={onInitialPromptConsumed}
+      />
     );
   }
 

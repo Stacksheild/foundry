@@ -30,6 +30,7 @@ export const App = ({ apiBaseUrl, apiToken }: { apiBaseUrl?: string; apiToken?: 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [current, setCurrent] = useState<number | null>(null);
   const [navActive, setNavActive] = useState("overview");
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   useEffect(() => {
     if (!apiBaseUrl) return;
@@ -55,9 +56,10 @@ export const App = ({ apiBaseUrl, apiToken }: { apiBaseUrl?: string; apiToken?: 
 
   const handleSubmit = (prompt: string) => {
     if (apiBaseUrl) {
-      // Live mode: BuildScreen creates the real session on first send and
-      // reports it back via onSessionCreated. Just navigate there with the
-      // typed prompt as the opening message.
+      // Live mode: BuildScreen auto-sends the typed prompt as the opening
+      // message of a real session, then reports the created session back
+      // via onSessionCreated.
+      setPendingPrompt(prompt);
       setCurrent(null);
       setScreen("build");
       return;
@@ -129,6 +131,8 @@ export const App = ({ apiBaseUrl, apiToken }: { apiBaseUrl?: string; apiToken?: 
               apiBaseUrl={apiBaseUrl}
               apiToken={apiToken}
               onSessionCreated={handleSessionCreated}
+              initialPrompt={pendingPrompt}
+              onInitialPromptConsumed={() => setPendingPrompt(null)}
               onPromote={() => {
                 setScreen("deploy");
                 setNavActive("deployments");

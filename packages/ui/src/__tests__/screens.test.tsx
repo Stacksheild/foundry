@@ -124,6 +124,36 @@ describe("BuildScreen — live mode (apiBaseUrl set)", () => {
     vi.unstubAllGlobals();
   });
 
+  it("auto-sends a prompt handed off from the Home screen as the opening message", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(makeStreamResponse(["On it"], 7));
+    vi.stubGlobal("fetch", fetchMock);
+    const consumed = vi.fn();
+
+    render(
+      <BuildScreen
+        session={null}
+        onPromote={vi.fn()}
+        apiBaseUrl="https://api.example.com"
+        apiToken="tok"
+        initialPrompt="Build an approvals app"
+        onInitialPromptConsumed={consumed}
+      />,
+    );
+
+    expect(await screen.findByText("On it")).toBeTruthy();
+    expect(screen.getByText("Build an approvals app")).toBeTruthy();
+    expect(consumed).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/build/chat",
+      expect.objectContaining({
+        body: JSON.stringify({ messages: [{ role: "user", content: "Build an approvals app" }], sessionId: undefined }),
+      }),
+    );
+
+    vi.unstubAllGlobals();
+  });
+
   it("shows an inline error bubble when the chat request fails", async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
     vi.stubGlobal("fetch", fetchMock);
