@@ -12,6 +12,60 @@ const BUILD_STEPS = [
   { text: "Deploying to dev environment", t: "4.2s" },
 ];
 
+const CODE_LINES = [
+  'import { useMetrics } from "@acme/analytics-sdk";',
+  'import { Card, BarList, Table } from "@acme/design-system";',
+  "",
+  "export const TeamProductivityDash = () => {",
+  '  const { dora, velocity, bottlenecks } = useMetrics("team-productivity");',
+  "",
+  "  return (",
+  "    <PageLayout title=\"Team Productivity\">",
+  "      <Card title=\"Deploy frequency — 30 days\">",
+  "        <TrendChart data={dora.deployFrequency} />",
+  "      </Card>",
+  "      <BarList title=\"Velocity by squad\" items={velocity} />",
+  "      <Table title=\"Top bottlenecks this week\" rows={bottlenecks} />",
+  "    </PageLayout>",
+  "  );",
+  "};",
+];
+
+const CodePane = () => (
+  <div style={{ background: "#1E1E2E", height: "100%", overflow: "auto", padding: "14px 18px" }}>
+    <div style={{ fontSize: 11.5, color: "#9CA0B8", marginBottom: 10, fontFamily: "monospace" }}>
+      src/screens/TeamProductivityDash.tsx
+    </div>
+    {CODE_LINES.map((line, i) => (
+      <div key={i} style={{ display: "flex", gap: 14, fontFamily: "monospace", fontSize: 12.5, lineHeight: 1.7 }}>
+        <span style={{ color: "#5A5E78", width: 20, textAlign: "right", flexShrink: 0, userSelect: "none" }}>{i + 1}</span>
+        <span style={{ color: line.startsWith("import") ? "#89B4FA" : "#CDD6F4", whiteSpace: "pre" }}>{line}</span>
+      </div>
+    ))}
+  </div>
+);
+
+const DEV_LOGS = [
+  { t: "14:02:08", msg: "vite v5.4 dev server running at team-prod-dash.foundry.app", level: "info" },
+  { t: "14:02:08", msg: "hmr connected — 47 modules transformed in 420ms", level: "info" },
+  { t: "14:02:11", msg: "GET /api/metrics/dora 200 12ms", level: "info" },
+  { t: "14:02:11", msg: "GET /api/metrics/velocity 200 9ms", level: "info" },
+  { t: "14:02:14", msg: "type-check clean · eslint clean (0 warnings)", level: "info" },
+  { t: "14:02:19", msg: "GET /api/metrics/bottlenecks 200 31ms", level: "info" },
+  { t: "14:02:23", msg: "deployed to dev — health check /readyz 200", level: "success" },
+];
+
+const LogsPane = () => (
+  <div style={{ background: T.bg, height: "100%", overflow: "auto", padding: "12px 18px" }}>
+    {DEV_LOGS.map((l, i) => (
+      <div key={i} style={{ display: "flex", gap: 12, fontFamily: "monospace", fontSize: 12.5, lineHeight: 1.9 }}>
+        <span style={{ color: T.textFaint, flexShrink: 0 }}>{l.t}</span>
+        <span style={{ color: l.level === "success" ? T.success : T.textMid }}>{l.msg}</span>
+      </div>
+    ))}
+  </div>
+);
+
 const MiniPreviewDash = () => (
   <div style={{ background: "#F9F9FB", height: "100%", overflow: "auto", padding: 18, fontSize: 13 }}>
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -114,15 +168,25 @@ const MiniPreviewDash = () => (
 
 export const BuildScreen = ({
   session,
-  onNavigateDash,
+  onPromote,
 }: {
   session: Session | null;
-  onNavigateDash: () => void;
+  onPromote: () => void;
 }) => {
   const [step, setStep] = useState(0);
   const [ready, setReady] = useState(false);
   const [pvTab, setPvTab] = useState("Preview");
   const [inp, setInp] = useState("");
+  const [shared, setShared] = useState(false);
+
+  const handleShare = () => {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    navigator.clipboard?.writeText(url).catch(() => {
+      // clipboard unavailable (permissions/insecure context) — still show feedback
+    });
+    setShared(true);
+    setTimeout(() => setShared(false), 2000);
+  };
 
   useEffect(() => {
     setStep(0);
@@ -265,7 +329,7 @@ export const BuildScreen = ({
                     </p>
                     <div style={{ display: "flex", gap: 7, flexWrap: "wrap" }}>
                       <button
-                        onClick={onNavigateDash}
+                        onClick={onPromote}
                         style={{
                           padding: "7px 14px",
                           background: T.accent,
@@ -283,6 +347,7 @@ export const BuildScreen = ({
                         <Icon name="deploy" size={12} color="#fff" /> Promote to Staging
                       </button>
                       <button
+                        onClick={() => setPvTab("Code")}
                         style={{
                           padding: "7px 14px",
                           color: T.accent,
@@ -296,17 +361,18 @@ export const BuildScreen = ({
                         Edit in IDE
                       </button>
                       <button
+                        onClick={handleShare}
                         style={{
                           padding: "7px 14px",
-                          color: T.textSub,
-                          border: `1px solid ${T.border}`,
+                          color: shared ? T.success : T.textSub,
+                          border: `1px solid ${shared ? T.success : T.border}`,
                           borderRadius: 6,
                           fontSize: 13,
                           background: "transparent",
                           cursor: "pointer",
                         }}
                       >
-                        Share
+                        {shared ? "✓ Link copied" : "Share"}
                       </button>
                     </div>
                   </div>
@@ -411,6 +477,10 @@ export const BuildScreen = ({
               <div style={{ fontSize: 14, color: T.textSub }}>Building your prototype…</div>
               <div style={{ fontSize: 12.5, color: T.textFaint }}>Wiring UI components</div>
             </div>
+          ) : pvTab === "Code" ? (
+            <CodePane />
+          ) : pvTab === "Logs" ? (
+            <LogsPane />
           ) : (
             <MiniPreviewDash />
           )}

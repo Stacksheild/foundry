@@ -29,8 +29,47 @@ describe("HomeScreen", () => {
 
 describe("BuildScreen", () => {
   it("renders the chat panel with the default prompt when no session is given", () => {
-    render(<BuildScreen session={null} onNavigateDash={vi.fn()} />);
+    render(<BuildScreen session={null} onPromote={vi.fn()} />);
     expect(screen.getByText("Build a team productivity dashboard")).toBeTruthy();
+  });
+
+  it("wires Promote to Staging to the deployment-progress flow once the build finishes", async () => {
+    const onPromote = vi.fn();
+    render(<BuildScreen session={null} onPromote={onPromote} />);
+
+    const promote = await screen.findByRole("button", { name: /Promote to Staging/ }, { timeout: 8000 });
+    fireEvent.click(promote);
+    expect(onPromote).toHaveBeenCalledTimes(1);
+  });
+
+  it("switches the preview panel to the Code tab when Edit in IDE is clicked", async () => {
+    render(<BuildScreen session={null} onPromote={vi.fn()} />);
+
+    const edit = await screen.findByRole("button", { name: "Edit in IDE" }, { timeout: 8000 });
+    fireEvent.click(edit);
+    expect(await screen.findByText("src/screens/TeamProductivityDash.tsx")).toBeTruthy();
+  });
+
+  it("shows dev logs when the Logs preview tab is clicked", async () => {
+    render(<BuildScreen session={null} onPromote={vi.fn()} />);
+
+    await screen.findByRole("button", { name: /Promote to Staging/ }, { timeout: 8000 });
+    fireEvent.click(screen.getByText("Logs"));
+    expect(await screen.findByText(/deployed to dev — health check/)).toBeTruthy();
+  });
+
+  it("copies a share link and confirms on the Share button", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText } });
+
+    render(<BuildScreen session={null} onPromote={vi.fn()} />);
+
+    const share = await screen.findByRole("button", { name: "Share" }, { timeout: 8000 });
+    fireEvent.click(share);
+    expect(writeText).toHaveBeenCalledTimes(1);
+    expect(await screen.findByRole("button", { name: /Link copied/ })).toBeTruthy();
+
+    vi.unstubAllGlobals();
   });
 });
 

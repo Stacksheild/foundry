@@ -83,9 +83,9 @@ export const App = ({ apiBaseUrl, apiToken }: { apiBaseUrl?: string; apiToken?: 
             <BuildScreen
               key={current ?? "new"}
               session={session}
-              onNavigateDash={() => {
-                setScreen("dashboard");
-                setNavActive("overview");
+              onPromote={() => {
+                setScreen("deploy");
+                setNavActive("deployments");
               }}
             />
           )}
