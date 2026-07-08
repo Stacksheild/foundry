@@ -14,6 +14,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     origin: process.env.FOUNDRY_CORS_ORIGIN
       ? process.env.FOUNDRY_CORS_ORIGIN.split(",").map((o) => o.trim()).filter(Boolean)
       : true,
+    exposedHeaders: ["x-foundry-session-id"],
   });
   registerAuthHook(app);
 

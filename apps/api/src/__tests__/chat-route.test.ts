@@ -92,6 +92,42 @@ describe("POST /build/chat — enabled", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it("uses FOUNDRY_DEFAULT_PROVIDER/FOUNDRY_DEFAULT_MODEL when body.provider is absent", async () => {
+    const { createAdapter } = await import("@foundry/agent-core");
+    mockAdapter.stream.mockReturnValue(fakeStream(["ok"]));
+    process.env.FOUNDRY_DEFAULT_PROVIDER = "ollama";
+    process.env.FOUNDRY_DEFAULT_MODEL = "qwen2.5:0.5b";
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/build/chat",
+      payload: { messages: [{ role: "user", content: "hi" }] },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(createAdapter).toHaveBeenCalledWith("ollama", { model: "qwen2.5:0.5b" });
+
+    delete process.env.FOUNDRY_DEFAULT_PROVIDER;
+    delete process.env.FOUNDRY_DEFAULT_MODEL;
+  });
+
+  it("explicit body.provider still wins over FOUNDRY_DEFAULT_PROVIDER", async () => {
+    const { createAdapter } = await import("@foundry/agent-core");
+    mockAdapter.stream.mockReturnValue(fakeStream(["ok"]));
+    process.env.FOUNDRY_DEFAULT_PROVIDER = "ollama";
+
+    const res = await app.inject({
+      method: "POST",
+      url: "/build/chat",
+      payload: { messages: [{ role: "user", content: "hi" }], provider: "anthropic" },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(createAdapter).toHaveBeenCalledWith("anthropic", { model: undefined });
+
+    delete process.env.FOUNDRY_DEFAULT_PROVIDER;
+  });
+
   it("writes a stream error into the response instead of throwing", async () => {
     // eslint-disable-next-line require-yield -- intentionally throws before ever yielding
     mockAdapter.stream.mockImplementation(async function* () {

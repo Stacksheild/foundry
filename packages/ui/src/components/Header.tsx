@@ -4,9 +4,11 @@ import type { ScreenId } from "../types";
 
 export const Header = ({
   setScreen,
+  live,
 }: {
   screen: ScreenId;
   setScreen: (s: ScreenId) => void;
+  live?: boolean;
 }) => (
   <header
     style={{
@@ -38,29 +40,44 @@ export const Header = ({
     </button>
     <div style={{ flex: 1 }} />
     <button
-      style={{
-        padding: "5px 12px",
-        border: "1.5px solid #C87000",
-        borderRadius: 5,
-        color: "#9A5800",
-        background: "transparent",
-        fontSize: 12,
-        fontWeight: 600,
-        display: "flex",
-        alignItems: "center",
-        gap: 5,
-      }}
+      style={
+        live
+          ? {
+              padding: "5px 12px",
+              border: `1.5px solid ${T.success}`,
+              borderRadius: 5,
+              color: T.success,
+              background: T.successBg,
+              fontSize: 12,
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+            }
+          : {
+              padding: "5px 12px",
+              border: "1.5px solid #C87000",
+              borderRadius: 5,
+              color: "#9A5800",
+              background: "transparent",
+              fontSize: 12,
+              fontWeight: 600,
+              display: "flex",
+              alignItems: "center",
+              gap: 5,
+            }
+      }
     >
       <span
         style={{
           width: 6,
           height: 6,
           borderRadius: "50%",
-          background: "#E09000",
+          background: live ? T.success : "#E09000",
           display: "inline-block",
         }}
       />
-      DEMO SIMULATION
+      {live ? "LIVE" : "DEMO SIMULATION"}
     </button>
     <button
       onClick={() => setScreen("dashboard")}
