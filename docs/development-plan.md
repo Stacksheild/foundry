@@ -182,11 +182,57 @@ plumbing).
   engine (both need a running proxy layer with real traffic in front of an
   app, which is a bigger infrastructure commitment than this round's scope).
 
+### Phase 2.75 — 3 wks — Agent platform reach (OpenCode-inspired)
+
+Prompted by a comparison to [OpenCode](https://opencode.ai) (open-source
+terminal/IDE coding agent). Distinct from Phase 2.5's spec-driven workflow —
+this is about how capable and reachable the agent itself is, not what
+process it follows:
+
+- **LSP-aware agent.** OpenCode automatically loads the right language
+  server for whatever it's editing, so the agent sees real diagnostics
+  (type errors, unresolved imports) instead of guessing from text.
+  **Foundry equivalent:** spin up the matching language server (`tsserver`
+  for the JS/TS templates, extendable per `foundry.plugin.json` template
+  type) alongside a scaffold/edit, and feed diagnostics into the
+  `agent-core` loop. Complements the already-flagged "Explain this change" +
+  diff view (Phase 2's "Not yet built") — a diff is much more useful shown
+  next to real type errors than alone.
+- **Multi-session (parallel agents on one project).** `apps/api` already
+  persists sessions (`GET /build/sessions`, `POST /build/chat` via
+  `apps/api/src/db.ts`) but drives one active build per app at a time.
+  Allowing concurrent sessions (e.g. one agent iterating frontend, another
+  backend) needs per-session working-directory isolation — a natural fit for
+  `packages/compute-providers`' exe.dev sandboxes, one VM per session instead
+  of one per app.
+- **Share links.** Add a tokenized, read-only URL for a given
+  `GET /build/sessions/:id` so a session can be shared for reference or
+  debugging without exposing the full API — small addition on top of
+  session persistence that already exists.
+- **Bring-your-existing-subscription auth.** OpenCode supports logging in
+  with an existing GitHub Copilot or ChatGPT Plus/Pro account instead of a
+  metered API key. `packages/agent-core` today only takes raw provider API
+  keys via env vars. OAuth-based adapters for Copilot/ChatGPT would remove
+  the "pay twice" friction for developers who already have a subscription —
+  worth prioritizing for adoption, since cost-to-try is a real barrier.
+- **Any model, via a registry instead of hand-written adapters.** OpenCode
+  routes through [Models.dev](https://models.dev), an open provider/model
+  catalog, to support 75+ providers including local models. Foundry
+  hardcodes three adapters (OpenAI/Anthropic/Ollama) in `agent-core`.
+  Adopting Models.dev's catalog for provider/model metadata lets
+  `pickAdapter()` generalize to any OpenAI-compatible or Models.dev-listed
+  endpoint instead of a new hand-written adapter per provider.
+
 ### Phase 4 — ongoing — Community & extensibility
 - Plugin marketplace docs — how to publish a template or deploy adapter
 - Public roadmap board (GitHub Projects) + "good first issue" labeling
 - Example gallery of apps built with Foundry, contributed by users
 - Docs site (Starlight/Docusaurus) with quick-start, architecture, plugin authoring guide
+- **Any editor** (OpenCode-inspired) — Foundry is web UI + CLI only today.
+  A VS Code extension surfacing Build chat and `foundry check` results
+  inline, and/or a desktop app wrapping `apps/web`, would meet developers
+  where they already work instead of requiring a browser tab. Bigger
+  packaging/distribution lift than Phase 2.75's items, so sequenced later.
 
 ## 5. Immediate next steps
 
