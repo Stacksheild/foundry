@@ -95,6 +95,67 @@ Noncommercial, not MIT — Foundry itself stays MIT).
 - **Not yet built:** "Explain this change" + diff view before applying agent
   edits (depends on the preview wiring above landing first).
 
+### Phase 2.5 — 4 wks — Spec-driven & role-aware agent workflow
+
+Prompted by external feedback comparing Foundry to
+[Kiro](https://kiro.dev/docs/specs/) and to an internal spec-driven toolkit
+with per-role agent skills (tracked in
+[#14](https://github.com/Stacksheild/foundry/issues/14)). Kiro's actual
+mechanics, not just the marketing name, map cleanly onto primitives Foundry
+already has — this phase is sequencing, not new infrastructure:
+
+- **Specs (requirements → design → tasks).** Kiro persists three markdown
+  artifacts per feature — `requirements.md` (EARS-notation user stories:
+  "WHEN [event] THE SYSTEM SHALL [behavior]"), `design.md` (architecture,
+  sequence diagrams), `tasks.md` (dependency-graphed, parallelizable work
+  items) — with an approval gate before each phase, or a "Quick Plan" path
+  that skips gates for well-understood asks.
+  **Foundry equivalent:** extend the existing chat session row in
+  `apps/api/src/db.ts` with a `phase` column (`requirements` → `design` →
+  `tasks` → `building`) and a `specs` table storing the generated markdown
+  per phase. `POST /build/chat` already streams through `agent-core`; the
+  new work is a prompt/parser pair per phase plus a "approve to continue"
+  action in the Build screen, not a new service. `foundry create --template`
+  becomes the literal "Quick Plan" path for already-well-understood app
+  shapes.
+- **Steering (persistent project context).** Kiro auto-generates
+  `product.md`/`tech.md`/`structure.md` by analyzing a codebase, then feeds
+  them into every agent turn; custom steering files load `auto` /
+  `conditional` (glob-matched) / `manual` (`#file` mention).
+  **Foundry equivalent:** `foundry.config.yml` (`packages/cli/src/config.ts`)
+  already walks up from cwd like ESLint config discovery — add a
+  `.foundry/steering/*.md` convention read at the same point and injected
+  into the `agent-core` system prompt before the adapter call. Auto-generating
+  the three foundation files from an existing target repo is a natural use of
+  the already-built `@sentinelai/scanner` codepath (it already reads a
+  filesystem tree for `foundry scan`).
+- **Hooks (event-triggered automation).** Kiro hooks run on file-system
+  events (save/create/delete) or agent lifecycle points
+  (`agentSpawn`/`preToolUse`/`postToolUse`/`stop`).
+  **Foundry equivalent:** start with the "hooks-lite" version already scoped
+  in #14 — auto-run `foundry check <path>` (security scan + tests + bundle
+  size, all real today via `packages/health-checks`) immediately after a
+  scaffold or agent edit, surfaced inline in the Build screen instead of
+  requiring a manual CLI call. File-watch-triggered hooks are a fast follow
+  once that loop exists.
+- **Role-scoped personas (the part Kiro doesn't do, but the internal toolkit
+  in the feedback does).** Instead of one generic chat agent, bind a
+  persona/prompt layer per SDLC role on top of the adapters
+  `packages/agent-core` already has: BA/Architect owns the
+  requirements/design phases above, Dev owns scaffolding
+  (`packages/cli/src/templates`), QA owns `packages/health-checks`, Security
+  owns `packages/scanner-service`, SRE owns deploy/canary. No new runtime —
+  each persona is a system-prompt + allowed-tool-subset config consumed by
+  the same `pickAdapter()` path.
+
+**Sequencing note:** none of the above matters to an outside evaluator until
+Phase 2's existing gap closes first — the agent chat and `preview-engine` are
+still not wired into the public `apps/web` Build screen, so specs/steering/
+hooks would still be invisible in the demo even once built. Wire the real
+loop into the demo *first*, then land specs → steering → hooks → personas in
+that order (each depends on the previous one's storage/prompt-injection
+plumbing).
+
 ### Phase 3 — 4 wks — Dashboard & deploy pipeline
 - **Real today:**
   - Security scan health check — `POST /scan`, `foundry scan`, and
